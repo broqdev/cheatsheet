@@ -1,0 +1,30 @@
+{
+  "name": "pj_flash_attention",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "render:cover": "node scripts/render-og-image.mjs",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview --host 0.0.0.0",
+    "typecheck": "tsc -b"
+  },
+  "dependencies": {
+    "katex": "^0.17.0",
+    "prismjs": "^1.30.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  },
+  "devDependencies": {
+    "@types/katex": "^0.16.8",
+    "@types/node": "^25.9.3",
+    "@types/prismjs": "^1.26.6",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.2",
+    "playwright-core": "^1.61.0",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.16"
+  }
+}
