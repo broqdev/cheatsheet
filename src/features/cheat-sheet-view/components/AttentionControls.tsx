@@ -7,7 +7,10 @@ type AttentionControlsProps = {
   attentionMaskLabel: string
   dropoutAvailable: boolean
   dropoutEnabled: boolean
+  fp8Available: boolean
+  fp8Enabled: boolean
   onToggleDropout: (enabled: boolean) => void
+  onToggleFp8: (enabled: boolean) => void
   onToggleAttentionMask: (enabled: boolean) => void
 }
 
@@ -29,10 +32,14 @@ export function AttentionControls({
   attentionMaskLabel,
   dropoutAvailable,
   dropoutEnabled,
+  fp8Available,
+  fp8Enabled,
   onToggleDropout,
+  onToggleFp8,
   onToggleAttentionMask,
 }: AttentionControlsProps) {
   const dropoutActive = dropoutAvailable && dropoutEnabled
+  const fp8Active = fp8Available && fp8Enabled
 
   return (
     <section className="control-strip" aria-label="Attention controls">
@@ -53,6 +60,17 @@ export function AttentionControls({
             onChange={(event) => onToggleDropout(event.currentTarget.checked)}
           />
           <ToggleLabel delta="dropout">Dropout</ToggleLabel>
+        </label>
+      ) : null}
+
+      {fp8Available ? (
+        <label className={`checkbox-control${fp8Active ? ' active' : ''}`}>
+          <input
+            type="checkbox"
+            checked={fp8Active}
+            onChange={(event) => onToggleFp8(event.currentTarget.checked)}
+          />
+          <ToggleLabel delta="fp8">Hopper FP8</ToggleLabel>
         </label>
       ) : null}
     </section>

@@ -1,4 +1,4 @@
-export type ToggleDelta = 'mask' | 'dropout'
+export type ToggleDelta = 'mask' | 'dropout' | 'fp8'
 
 export type Segment =
   | { kind: 'text'; value: string; delta?: ToggleDelta }
@@ -38,6 +38,7 @@ export type AttentionExample = {
   algorithmTitle: string
   content: Record<AttentionMode, AttentionContent>
   dropoutContent?: Partial<Record<AttentionMode, AttentionContent>>
+  fp8Content?: Partial<Record<AttentionMode, AttentionContent>>
 }
 
 export type CatalogItem = {

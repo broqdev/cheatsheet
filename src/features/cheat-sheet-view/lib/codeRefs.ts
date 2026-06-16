@@ -13,6 +13,7 @@ export type AttentionContentSpec = Omit<AttentionContent, 'code' | 'rows' | 'not
   rawCode: string
   rows: AlgorithmLineSpec[]
   notes?: LatexBlockSpec[]
+  ignoredUnusedRefs?: string[]
 }
 
 type ParsedCodeRefs = {
@@ -124,8 +125,15 @@ function resolveNote(
   }
 }
 
-function warnUnusedRefs(refIndex: Map<string, number[]>, usedRefs: Set<string>) {
-  const unusedRefs = Array.from(refIndex.keys()).filter((ref) => !usedRefs.has(ref))
+function warnUnusedRefs(
+  refIndex: Map<string, number[]>,
+  usedRefs: Set<string>,
+  ignoredUnusedRefs: string[] = []
+) {
+  const ignoredRefs = new Set(ignoredUnusedRefs)
+  const unusedRefs = Array.from(refIndex.keys()).filter(
+    (ref) => !usedRefs.has(ref) && !ignoredRefs.has(ref)
+  )
 
   if (unusedRefs.length > 0 && import.meta.env.DEV) {
     console.warn(`Unused code refs: ${unusedRefs.join(', ')}`)
@@ -138,7 +146,7 @@ export function defineAttentionContent(spec: AttentionContentSpec): AttentionCon
   const rows = spec.rows.map((line) => resolveLine(line, parsedCode.refIndex, usedRefs))
   const notes = spec.notes?.map((note) => resolveNote(note, parsedCode.refIndex, usedRefs))
 
-  warnUnusedRefs(parsedCode.refIndex, usedRefs)
+  warnUnusedRefs(parsedCode.refIndex, usedRefs, spec.ignoredUnusedRefs)
 
   return {
     code: parsedCode.code,

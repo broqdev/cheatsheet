@@ -63,15 +63,20 @@ function CheatSheetViewPage() {
   const [selectedLineId, setSelectedLineId] = useState<string | null>(null)
   const [attentionMaskEnabled, setAttentionMaskEnabled] = useState(false)
   const [dropoutEnabled, setDropoutEnabled] = useState(false)
+  const [fp8Enabled, setFp8Enabled] = useState(false)
   const [copiedTarget, setCopiedTarget] = useState<CopyTarget | null>(null)
   const codeRegionRef = useRef<HTMLDivElement>(null)
 
   const activeExample = examples.find((example) => example.id === activeExampleId) ?? examples[0]
   const attentionMode: AttentionMode = attentionMaskEnabled ? 'masked' : 'unmasked'
   const dropoutContent = activeExample.dropoutContent?.[attentionMode]
+  const fp8Content = activeExample.fp8Content?.[attentionMode]
   const dropoutAvailable = activeExample.id === 'flash1' && Boolean(dropoutContent)
+  const fp8Available = activeExample.id === 'flash3' && Boolean(fp8Content)
   const activeContent =
-    dropoutEnabled && dropoutAvailable && dropoutContent
+    fp8Enabled && fp8Available && fp8Content
+      ? fp8Content
+      : dropoutEnabled && dropoutAvailable && dropoutContent
       ? dropoutContent
       : activeExample.content[attentionMode]
   const activeLineId = selectedLineId ?? hoveredLineId
@@ -95,6 +100,7 @@ function CheatSheetViewPage() {
     function syncExampleFromUrlTag() {
       setActiveExampleId(exampleFromUrlTag(window.location.hash)?.id ?? examples[0].id)
       setDropoutEnabled(false)
+      setFp8Enabled(false)
       setHoveredLineId(null)
       setSelectedLineId(null)
     }
@@ -110,6 +116,7 @@ function CheatSheetViewPage() {
 
   function resetExampleState() {
     setDropoutEnabled(false)
+    setFp8Enabled(false)
     setHoveredLineId(null)
     setSelectedLineId(null)
   }
@@ -147,6 +154,16 @@ function CheatSheetViewPage() {
     }
 
     setDropoutEnabled(enabled)
+    setHoveredLineId(null)
+    setSelectedLineId(null)
+  }
+
+  function toggleFp8(enabled: boolean) {
+    if (enabled && !fp8Available) {
+      return
+    }
+
+    setFp8Enabled(enabled)
     setHoveredLineId(null)
     setSelectedLineId(null)
   }
@@ -291,7 +308,10 @@ function CheatSheetViewPage() {
         attentionMaskLabel={activeExample.id === 'flash2' || activeExample.id === 'flash3' ? 'Causal Attention' : 'Attention mask'}
         dropoutAvailable={dropoutAvailable}
         dropoutEnabled={dropoutEnabled}
+        fp8Available={fp8Available}
+        fp8Enabled={fp8Enabled}
         onToggleDropout={toggleDropout}
+        onToggleFp8={toggleFp8}
         onToggleAttentionMask={toggleAttentionMask}
       />
 

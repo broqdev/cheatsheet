@@ -1,13 +1,108 @@
-import type { AlgorithmLine, AttentionExample, Segment } from '../../model'
+import type { AttentionExample, Segment } from '../../model'
+import flashAttention3Code from './code/flashAttention3.py?raw'
+import causalFlashAttention3Code from './code/causalFlashAttention3.py?raw'
+import flashAttention3HopperFp8Code from './code/flashAttention3HopperFp8.py?raw'
+import causalFlashAttention3HopperFp8Code from './code/causalFlashAttention3HopperFp8.py?raw'
+import { defineAttentionContent, type AlgorithmLineSpec } from '../../lib/codeRefs'
 import { math, strong, text } from '../../lib/segments'
 
-const flashAttention3Code = ''
+const mappedCodeRefIds = new Set([
+  'flash3-cta-forward-label',
+  'flash3-cta-pipeline',
+  'flash3-cta-load-q',
+  'flash3-cta-commit-q',
+  'flash3-cta-producer-loop',
+  'flash3-cta-wait-stage',
+  'flash3-cta-load-kv',
+  'flash3-cta-commit-kv',
+  'flash3-cta-init-state',
+  'flash3-cta-wait-q',
+  'flash3-cta-consumer-loop',
+  'flash3-cta-wait-k',
+  'flash3-cta-score',
+  'flash3-cta-rowmax',
+  'flash3-cta-prob-l',
+  'flash3-cta-wait-v',
+  'flash3-cta-output',
+  'flash3-cta-consumer-end',
+  'flash3-cta-normalize',
+  'flash3-cta-write',
+  'flash3-consumer-forward-label',
+  'flash3-consumer-init',
+  'flash3-consumer-wait-qk0',
+  'flash3-consumer-score-cur',
+  'flash3-consumer-release-k0',
+  'flash3-consumer-online-cur',
+  'flash3-consumer-loop',
+  'flash3-consumer-wait-kj',
+  'flash3-consumer-score-next',
+  'flash3-consumer-wait-vprev',
+  'flash3-consumer-output-prev',
+  'flash3-consumer-wait-score-next',
+  'flash3-consumer-online-next',
+  'flash3-consumer-rescale-output',
+  'flash3-consumer-release-buffer',
+  'flash3-consumer-copy-next',
+  'flash3-consumer-wait-vlast',
+  'flash3-consumer-output-last',
+  'flash3-consumer-epilogue',
+  'flash3-backward-label',
+  'flash3-bwd-preprocess',
+  'flash3-bwd-partition-qkv',
+  'flash3-bwd-partition-do-l',
+  'flash3-bwd-load-kv',
+  'flash3-bwd-commit-kv',
+  'flash3-bwd-producer-loop',
+  'flash3-bwd-load-q-do',
+  'flash3-bwd-commit-q-do',
+  'flash3-bwd-init-dk-dv',
+  'flash3-bwd-wait-kv',
+  'flash3-bwd-consumer-loop',
+  'flash3-bwd-wait-qi',
+  'flash3-bwd-load-li-di',
+  'flash3-bwd-score',
+  'flash3-bwd-wait-do',
+  'flash3-bwd-dp',
+  'flash3-bwd-prob',
+  'flash3-bwd-ds',
+  'flash3-bwd-dv',
+  'flash3-bwd-dk',
+  'flash3-bwd-dq-local',
+  'flash3-bwd-dq-writer-loop',
+  'flash3-bwd-dq-ready',
+  'flash3-bwd-dq-atomic',
+  'flash3-bwd-dq-writer-end',
+])
 
-const row = (id: string, parts: Segment[], indent = 0): AlgorithmLine => ({
+const causalCodeRefIds = [
+  'flash3-fwd-causal-mask',
+  'flash3-bwd-causal-prob',
+  'flash3-bwd-dq-causal-mask',
+]
+
+const fp8CodeRefIds = [
+  'flash3-fp8-dtype',
+  'flash3-fp8-descale-load',
+  'flash3-fp8-qk-descale',
+  'flash3-fp8-v-desc',
+  'flash3-fp8-v-load',
+  'flash3-fp8-p-cast',
+  'flash3-fp8-v-descale',
+  'flash3-fp8-output-store',
+]
+
+function addCodeRefs(row: AlgorithmLineSpec, ...codeRefs: string[]): AlgorithmLineSpec {
+  return {
+    ...row,
+    codeRefs: [...(row.codeRefs ?? []), ...codeRefs],
+  }
+}
+
+const row = (id: string, parts: Segment[], indent = 0): AlgorithmLineSpec => ({
   id,
   indent,
   parts,
-  codeLines: [],
+  codeRefs: mappedCodeRefIds.has(id) ? [id] : [],
 })
 
 const flash3ForwardRequire = [
@@ -42,7 +137,28 @@ const causalFlash3ForwardRequire = [
   text(').'),
 ]
 
-const flash3Rows: AlgorithmLine[] = [
+function withHopperFp8Require(require: Segment[]) {
+  return [
+    ...require.slice(0, -1),
+    text(', '),
+    text('Hopper FP8 inputs ', 'fp8'),
+    math(String.raw`\widehat Q,\widehat K,\widehat V`, 'fp8'),
+    text(' with descales ', 'fp8'),
+    math(String.raw`d_Q,d_K,d_V`, 'fp8'),
+    text('; scores use ', 'fp8'),
+    math(String.raw`\alpha d_Q d_K`, 'fp8'),
+    text(', the output epilogue uses ', 'fp8'),
+    math(String.raw`d_V`, 'fp8'),
+    text(', and ', 'fp8'),
+    math(String.raw`\widehat V`, 'fp8'),
+    text(' uses a transposed descriptor.', 'fp8'),
+  ]
+}
+
+const hopperFp8Flash3ForwardRequire = withHopperFp8Require(flash3ForwardRequire)
+const causalHopperFp8Flash3ForwardRequire = withHopperFp8Require(causalFlash3ForwardRequire)
+
+const flash3Rows: AlgorithmLineSpec[] = [
   row('flash3-cta-forward-label', [
     strong('forward pass without intra-consumer overlapping - CTA view'),
   ]),
@@ -519,7 +635,7 @@ const flash3Rows: AlgorithmLine[] = [
   row('flash3-bwd-end-if', [strong('end if')]),
 ]
 
-function withCausalRows(row: AlgorithmLine): AlgorithmLine {
+function withCausalRows(row: AlgorithmLineSpec): AlgorithmLineSpec {
   if (row.id === 'flash3-cta-score') {
     return {
       ...row,
@@ -530,6 +646,7 @@ function withCausalRows(row: AlgorithmLine): AlgorithmLine {
         math(String.raw`-\infty`, 'mask'),
         text('. Commit and wait.'),
       ],
+      codeRefs: ['flash3-cta-score', 'flash3-fwd-causal-mask'],
     }
   }
 
@@ -541,6 +658,7 @@ function withCausalRows(row: AlgorithmLine): AlgorithmLine {
         math(String.raw`S_{\mathrm{cur}}=\alpha Q_iK_0^\top+M_{i0}^{\mathrm{causal}}`, 'mask'),
         text(' using WGMMA. Commit and wait.'),
       ],
+      codeRefs: ['flash3-consumer-score-cur', 'flash3-fwd-causal-mask'],
     }
   }
 
@@ -552,6 +670,7 @@ function withCausalRows(row: AlgorithmLine): AlgorithmLine {
         math(String.raw`S_{\mathrm{next}}=\alpha Q_iK_j^\top+M_{ij}^{\mathrm{causal}}`, 'mask'),
         text(' using WGMMA. Commit but do not wait.'),
       ],
+      codeRefs: ['flash3-consumer-score-next', 'flash3-fwd-causal-mask'],
     }
   }
 
@@ -563,6 +682,7 @@ function withCausalRows(row: AlgorithmLine): AlgorithmLine {
         math(String.raw`\alpha Q_iK_j^\top+M_{ij}^{\mathrm{causal}}`, 'mask'),
         text('.'),
       ],
+      codeRefs: ['flash3-consumer-wait-score-next', 'flash3-fwd-causal-mask'],
     }
   }
 
@@ -574,6 +694,7 @@ function withCausalRows(row: AlgorithmLine): AlgorithmLine {
         math(String.raw`S_i^{(j)}=\alpha Q_iK_j^\top+M_{ij}^{\mathrm{causal}}\in\mathbb{R}^{B_r\times B_c}`, 'mask'),
         text(' (SS-GEMM). Commit.'),
       ],
+      codeRefs: ['flash3-bwd-score', 'flash3-bwd-causal-prob', 'flash3-bwd-dq-causal-mask'],
     }
   }
 
@@ -587,7 +708,12 @@ function withCausalRows(row: AlgorithmLine): AlgorithmLine {
         math(String.raw`P_i^{(j)}=\exp(S_i^{(j)}-L_i)`, 'mask'),
         text('; masked future positions stay zero.', 'mask'),
       ],
+      codeRefs: ['flash3-bwd-prob', 'flash3-bwd-causal-prob', 'flash3-bwd-dq-causal-mask'],
     }
+  }
+
+  if (row.id === 'flash3-bwd-dq-local') {
+    return addCodeRefs(row, 'flash3-bwd-dq-causal-mask')
   }
 
   return row
@@ -595,23 +721,247 @@ function withCausalRows(row: AlgorithmLine): AlgorithmLine {
 
 const causalFlash3Rows = flash3Rows.map(withCausalRows)
 
+function hasCausalMask(row: AlgorithmLineSpec) {
+  return row.codeRefs?.includes('flash3-fwd-causal-mask') ?? false
+}
+
+function fp8ScoreFormula(rowId: string, causal: boolean) {
+  const mask = causal
+    ? rowId === 'flash3-consumer-score-cur'
+      ? String.raw`+M_{i0}^{\mathrm{causal}}`
+      : String.raw`+M_{ij}^{\mathrm{causal}}`
+    : ''
+
+  if (rowId === 'flash3-consumer-score-cur') {
+    return String.raw`S_{\mathrm{cur}}=\alpha d_Q d_K\widehat Q_i\widehat K_0^\top${mask}`
+  }
+
+  if (rowId === 'flash3-consumer-score-next' || rowId === 'flash3-consumer-wait-score-next') {
+    return String.raw`S_{\mathrm{next}}=\alpha d_Q d_K\widehat Q_i\widehat K_j^\top${mask}`
+  }
+
+  return String.raw`S_i^{(j)}=\alpha d_Q d_K\widehat Q_i\widehat K_j^\top${mask}`
+}
+
+function withHopperFp8Rows(row: AlgorithmLineSpec): AlgorithmLineSpec {
+  if (row.id === 'flash3-cta-init-state' || row.id === 'flash3-consumer-init') {
+    return addCodeRefs(
+      {
+        ...row,
+        parts: [
+          ...row.parts,
+          text(' Load FP8 descales ', 'fp8'),
+          math(String.raw`d_Q,d_K,d_V`, 'fp8'),
+          text(' and set the effective score scale to ', 'fp8'),
+          math(String.raw`\alpha d_Q d_K`, 'fp8'),
+          text('.', 'fp8'),
+        ],
+      },
+      'flash3-fp8-descale-load',
+      'flash3-fp8-qk-descale'
+    )
+  }
+
+  if (row.id === 'flash3-cta-load-kv') {
+    return addCodeRefs(
+      {
+        ...row,
+        parts: [
+          text('Issue loads of '),
+          math(String.raw`\widehat K_j`, 'fp8'),
+          text(' and '),
+          text('Hopper FP8 ', 'fp8'),
+          math(String.raw`\widehat V_j`, 'fp8'),
+          text(' using a transposed ', 'fp8'),
+          math(String.raw`[d,N]`, 'fp8'),
+          text(' descriptor at the '),
+          math(String.raw`(j\bmod s)`),
+          text('th stage of the buffer.'),
+        ],
+      },
+      'flash3-fp8-v-desc',
+      'flash3-fp8-v-load'
+    )
+  }
+
+  if (
+    row.id === 'flash3-cta-score'
+    || row.id === 'flash3-consumer-score-cur'
+    || row.id === 'flash3-consumer-score-next'
+  ) {
+    return addCodeRefs(
+      {
+        ...row,
+        parts: [
+          text('Compute '),
+          math(fp8ScoreFormula(row.id, hasCausalMask(row)), 'fp8'),
+          text(row.id === 'flash3-cta-score' ? ' (SS-GEMM). Commit and wait.' : ' using WGMMA. Commit'),
+          ...(row.id === 'flash3-consumer-score-next' ? [text(' but do not wait.')] : row.id === 'flash3-consumer-score-cur' ? [text(' and wait.')] : []),
+        ],
+      },
+      'flash3-fp8-qk-descale'
+    )
+  }
+
+  if (row.id === 'flash3-consumer-wait-score-next') {
+    return addCodeRefs(
+      {
+        ...row,
+        parts: [
+          text('Wait for the WGMMA '),
+          math(fp8ScoreFormula(row.id, hasCausalMask(row)), 'fp8'),
+          text('.'),
+        ],
+      },
+      'flash3-fp8-qk-descale'
+    )
+  }
+
+  if (row.id === 'flash3-cta-output') {
+    return addCodeRefs(
+      {
+        ...row,
+        parts: [
+          text('Cast '),
+          math(String.raw`\tilde P_i^{(j)}`, 'fp8'),
+          text(' to ', 'fp8'),
+          math(String.raw`\mathrm{tl.float8\_e5m2}`, 'fp8'),
+          text(' and compute '),
+          math(String.raw`O_i=\operatorname{diag}(\exp(m_i^{\mathrm{old}}-m_i))^{-1}O_i+\tilde P_i^{(j)}\widehat V_j`, 'fp8'),
+          text(' (RS-GEMM). Commit and wait; ', 'fp8'),
+          math(String.raw`d_V`, 'fp8'),
+          text(' is applied in the epilogue.', 'fp8'),
+        ],
+      },
+      'flash3-fp8-dtype',
+      'flash3-fp8-p-cast'
+    )
+  }
+
+  if (row.id === 'flash3-cta-normalize') {
+    return addCodeRefs(
+      {
+        ...row,
+        parts: [
+          text('Compute '),
+          math(String.raw`O_i=d_V\operatorname{diag}(\ell_i)^{-1}O_i`, 'fp8'),
+          text(' and '),
+          math(String.raw`L_i=m_i+\log(\ell_i)`),
+          text('.'),
+        ],
+      },
+      'flash3-fp8-v-descale'
+    )
+  }
+
+  if (row.id === 'flash3-cta-write') {
+    return addCodeRefs(
+      {
+        ...row,
+        parts: [
+          text('Write '),
+          math(String.raw`O_i`, 'fp8'),
+          text(' from the Hopper FP8 path and write ', 'fp8'),
+          math(String.raw`L_i`),
+          text(' to HBM as the '),
+          math(String.raw`i`),
+          text('th block of '),
+          math(String.raw`O`),
+          text(' and '),
+          math(String.raw`L`),
+          text('.'),
+        ],
+      },
+      'flash3-fp8-output-store'
+    )
+  }
+
+  if (row.id === 'flash3-consumer-wait-vprev' || row.id === 'flash3-consumer-wait-vlast') {
+    return addCodeRefs(row, 'flash3-fp8-v-desc', 'flash3-fp8-v-load')
+  }
+
+  if (row.id === 'flash3-consumer-output-prev' || row.id === 'flash3-consumer-output-last') {
+    return addCodeRefs(
+      {
+        ...row,
+        parts: [
+          text('Cast the probability tile to ', 'fp8'),
+          math(String.raw`\mathrm{tl.float8\_e5m2}`, 'fp8'),
+          text(' and compute the FP8 output update with ', 'fp8'),
+          math(row.id === 'flash3-consumer-output-prev'
+            ? String.raw`\tilde P_{\mathrm{cur}}\widehat V_{j-1}`
+            : String.raw`\tilde P_{\mathrm{last}}\widehat V_{T_c-1}`, 'fp8'),
+          text('; ', 'fp8'),
+          math(String.raw`d_V`, 'fp8'),
+          text(' waits for the epilogue.', 'fp8'),
+        ],
+      },
+      'flash3-fp8-dtype',
+      'flash3-fp8-p-cast'
+    )
+  }
+
+  if (row.id === 'flash3-consumer-epilogue') {
+    return addCodeRefs(
+      {
+        ...row,
+        parts: [
+          text('Epilogue: rescale '),
+          math(String.raw`O_i`),
+          text(', apply ', 'fp8'),
+          math(String.raw`d_V`, 'fp8'),
+          text(', compute '),
+          math(String.raw`L_i`),
+          text(', and write '),
+          math(String.raw`O_i`, 'fp8'),
+          text(' from the Hopper FP8 path while ', 'fp8'),
+          math(String.raw`L_i`),
+          text(' stays in HBM.'),
+        ],
+      },
+      'flash3-fp8-v-descale',
+      'flash3-fp8-output-store'
+    )
+  }
+
+  return row
+}
+
+const hopperFp8Flash3Rows = flash3Rows.map(withHopperFp8Rows)
+const causalHopperFp8Flash3Rows = causalFlash3Rows.map(withHopperFp8Rows)
+
 export const flashAttention3Example: AttentionExample = {
   id: 'flash3',
   urlTag: 'flashattention-3',
   label: 'FlashAttention-3',
   description:
-    'FlashAttention-3 adds warp specialization and asynchronous producer, consumer, and dQ-writer roles around exact tiled attention.',
+    'FlashAttention-3 targets NVIDIA Hopper with asynchronous, warp-specialized producer, consumer, and dQ-writer pipelines for exact tiled attention.',
   algorithmTitle: 'FlashAttention-3',
   content: {
-    unmasked: {
-      code: flashAttention3Code,
+    unmasked: defineAttentionContent({
+      rawCode: flashAttention3Code,
       require: flash3ForwardRequire,
       rows: flash3Rows,
-    },
-    masked: {
-      code: flashAttention3Code,
+      ignoredUnusedRefs: [...causalCodeRefIds, ...fp8CodeRefIds],
+    }),
+    masked: defineAttentionContent({
+      rawCode: causalFlashAttention3Code,
       require: causalFlash3ForwardRequire,
       rows: causalFlash3Rows,
-    },
+      ignoredUnusedRefs: fp8CodeRefIds,
+    }),
+  },
+  fp8Content: {
+    unmasked: defineAttentionContent({
+      rawCode: flashAttention3HopperFp8Code,
+      require: hopperFp8Flash3ForwardRequire,
+      rows: hopperFp8Flash3Rows,
+      ignoredUnusedRefs: causalCodeRefIds,
+    }),
+    masked: defineAttentionContent({
+      rawCode: causalFlashAttention3HopperFp8Code,
+      require: causalHopperFp8Flash3ForwardRequire,
+      rows: causalHopperFp8Flash3Rows,
+    }),
   },
 }
