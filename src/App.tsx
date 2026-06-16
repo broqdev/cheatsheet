@@ -1,7 +1,7 @@
-import AttentionExplorerPage from './pages/AttentionExplorerPage'
+import CheatSheetViewPage from './pages/CheatSheetViewPage'
 
 function App() {
-  return <AttentionExplorerPage />
+  return <CheatSheetViewPage />
 }
 
 export default App

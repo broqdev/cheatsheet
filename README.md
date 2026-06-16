@@ -1,6 +1,6 @@
-# Flash Attention Lab
+# Broq Cheatsheet
 
-Static Vite + React project site scaffolded for GitHub Pages.
+Interactive FlashAttention reference that links LaTeX equations to matching PyTorch and Triton-style code.
 
 ## Local Development
 

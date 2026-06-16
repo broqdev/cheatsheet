@@ -1,77 +1,7 @@
-import {
-  type CSSProperties,
-  type KeyboardEvent,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react'
-import katex from 'katex'
-import Prism from 'prismjs'
-import 'prismjs/components/prism-python'
-import 'katex/dist/katex.min.css'
+import type { AlgorithmLine, AttentionExample, CatalogSection, LatexBlock } from '../model'
+import { math, strong, text } from '../lib/segments'
 
-type Segment =
-  | { kind: 'text'; value: string }
-  | { kind: 'math'; value: string }
-  | { kind: 'strong'; value: string }
-
-type AlgorithmLine = {
-  id: string
-  number?: number
-  indent?: number
-  parts: Segment[]
-  codeLines: number[]
-}
-
-type AttentionMode = 'unmasked' | 'masked'
-
-type LatexBlock = {
-  id: string
-  title: string
-  require?: Segment[]
-  requireLabel?: string
-  rows: AlgorithmLine[]
-}
-
-type AttentionContent = {
-  require: Segment[]
-  rows: AlgorithmLine[]
-  code: string
-  notes?: LatexBlock[]
-}
-
-type AttentionExample = {
-  id: string
-  label: string
-  algorithmTitle: string
-  content: Record<AttentionMode, AttentionContent>
-}
-
-type CatalogItem = {
-  id: string
-  label: string
-  exampleId?: string
-}
-
-type CatalogSection = {
-  id: string
-  label: string
-  items: CatalogItem[]
-}
-
-type AlgorithmBlock = {
-  id: 'forward' | 'backward'
-  title: string
-  require: Segment[]
-  rows: AlgorithmLine[]
-}
-
-const text = (value: string): Segment => ({ kind: 'text', value })
-const math = (value: string): Segment => ({ kind: 'math', value })
-const strong = (value: string): Segment => ({ kind: 'strong', value })
-
-const catalogSections: CatalogSection[] = [
+export const catalogSections: CatalogSection[] = [
   {
     id: 'flash-attention',
     label: 'FlashAttention',
@@ -629,7 +559,7 @@ const naiveCostNotes: LatexBlock[] = [
 const flashCostNotes: LatexBlock[] = [
   {
     id: 'flash-flops-space',
-    title: 'FlashAttention-1 FLOPs and space',
+    title: 'FlashAttention-1 FLOPs, space, and HBM accesses',
     rows: [
       {
         id: 'cost-flash-flops-theorem',
@@ -732,6 +662,47 @@ const flashCostNotes: LatexBlock[] = [
           text(' and saved normalizers, avoiding saved '),
           math(String.raw`\Theta(N^2)`),
           text(' attention state.'),
+        ],
+        codeLines: [],
+      },
+      {
+        id: 'cost-flash-hbm-theorem',
+        number: 10,
+        parts: [
+          strong('Theorem 3 (HBM accesses). '),
+          text('For '),
+          math(String.raw`d\le M\le Nd`),
+          text(', FlashAttention-1 uses '),
+          math(String.raw`\Theta(N^2d^2M^{-1})`),
+          text(' HBM accesses; standard attention uses '),
+          math(String.raw`\Theta(Nd+N^2)`),
+          text('.'),
+        ],
+        codeLines: [],
+      },
+      {
+        id: 'cost-flash-hbm-passes',
+        number: 11,
+        parts: [
+          text('A '),
+          math(String.raw`K,V`),
+          text(' tile stays in SRAM while the algorithm makes '),
+          math(String.raw`\Theta(NdM^{-1})`),
+          text(' passes over '),
+          math(String.raw`\Theta(Nd)`),
+          text(' query data.'),
+        ],
+        codeLines: [],
+      },
+      {
+        id: 'cost-flash-hbm-intuition',
+        number: 12,
+        parts: [
+          text('When '),
+          math(String.raw`d^2\ll M`),
+          text(', this avoids the dominant '),
+          math(String.raw`N\times N`),
+          text(' score/probability traffic through HBM.'),
         ],
         codeLines: [],
       },
@@ -1095,7 +1066,7 @@ const maskedFlashRows: AlgorithmLine[] = [
   },
 ]
 
-const examples: AttentionExample[] = [
+export const examples: AttentionExample[] = [
   {
     id: 'naive',
     label: 'Naive attention',
@@ -1136,497 +1107,3 @@ const examples: AttentionExample[] = [
   },
 ]
 
-function renderInlineLatex(tex: string) {
-  return katex.renderToString(tex, {
-    displayMode: false,
-    output: 'html',
-    throwOnError: false,
-    trust: false,
-  })
-}
-
-function highlightedCodeLines(code: string) {
-  const grammar = Prism.languages.python
-
-  return code.split('\n').map((line, index) => ({
-    number: index + 1,
-    html: Prism.highlight(line || ' ', grammar, 'python'),
-  }))
-}
-
-function labelFromParts(parts: Segment[]) {
-  return parts.map((part) => part.value).join('').replace(/\.$/, '')
-}
-
-function blockRequire(
-  example: AttentionExample,
-  attentionMode: AttentionMode,
-  content: AttentionContent,
-  blockId: AlgorithmBlock['id']
-) {
-  if (blockId === 'forward') {
-    if (example.id === 'naive' && attentionMode === 'masked') {
-      return [
-        text('Matrices '),
-        math(String.raw`Q,K,V \in \mathbb{R}^{N \times d}`),
-        text(' and additive mask '),
-        math(String.raw`M \in \{0,-\infty\}^{N \times N}`),
-        text('.'),
-      ]
-    }
-
-    if (example.id === 'naive') {
-      return [
-        text('Matrices '),
-        math(String.raw`Q,K,V \in \mathbb{R}^{N \times d}`),
-        text('.'),
-      ]
-    }
-
-    return content.require
-  }
-
-  if (example.id === 'naive') {
-    return [
-      text('Matrices '),
-      math(String.raw`Q,K,V,O,P`),
-      text(', output gradient '),
-      math(String.raw`dO`),
-      text('.'),
-    ]
-  }
-
-  if (attentionMode === 'masked') {
-    return [
-      text('Forward outputs '),
-      math(String.raw`O,L`),
-      text(', matrices '),
-      math(String.raw`Q,K,V`),
-      text(', additive mask '),
-      math(String.raw`A`),
-      text(', output gradient '),
-      math(String.raw`dO`),
-      text('.'),
-    ]
-  }
-
-  return [
-    text('Forward output '),
-    math(String.raw`(O,L)`),
-    text(', input matrices, and output gradient '),
-    math(String.raw`dO`),
-    text('.'),
-  ]
-}
-
-function algorithmBlocks(
-  example: AttentionExample,
-  attentionMode: AttentionMode,
-  content: AttentionContent
-): AlgorithmBlock[] {
-  const blocks: AlgorithmBlock[] = [
-    {
-      id: 'forward',
-      title: 'Forward pass',
-      require: blockRequire(example, attentionMode, content, 'forward'),
-      rows: [],
-    },
-  ]
-
-  for (const row of content.rows) {
-    if (row.id.endsWith('forward-label')) {
-      blocks[0].title = labelFromParts(row.parts)
-      continue
-    }
-
-    if (row.id.endsWith('backward-label') || row.id.endsWith('bwd-label')) {
-      blocks.push({
-        id: 'backward',
-        title: labelFromParts(row.parts),
-        require: blockRequire(example, attentionMode, content, 'backward'),
-        rows: [],
-      })
-      continue
-    }
-
-    blocks[blocks.length - 1].rows.push(row)
-  }
-
-  return blocks.filter((block) => block.rows.length > 0)
-}
-
-function normalizeCatalogQuery(value: string) {
-  return value.toLowerCase().replace(/[^a-z0-9]/g, '')
-}
-
-function fuzzyMatch(label: string, query: string) {
-  const normalizedLabel = normalizeCatalogQuery(label)
-  const normalizedQuery = normalizeCatalogQuery(query)
-
-  if (!normalizedQuery) {
-    return true
-  }
-
-  if (normalizedLabel.includes(normalizedQuery)) {
-    return true
-  }
-
-  let queryIndex = 0
-
-  for (const char of normalizedLabel) {
-    if (char === normalizedQuery[queryIndex]) {
-      queryIndex += 1
-    }
-
-    if (queryIndex === normalizedQuery.length) {
-      return true
-    }
-  }
-
-  return false
-}
-
-function filteredCatalogSections(query: string) {
-  return catalogSections
-    .map((section) => {
-      const sectionMatches = fuzzyMatch(section.label, query)
-      const items = section.items.filter((item) => sectionMatches || fuzzyMatch(item.label, query))
-
-      return { ...section, items }
-    })
-    .filter((section) => section.items.length > 0)
-}
-
-type CatalogDropdownProps = {
-  activeLabel: string
-  activeExampleId: string
-  onSelectExample: (exampleId: string) => void
-}
-
-function CatalogDropdown({
-  activeLabel,
-  activeExampleId,
-  onSelectExample,
-}: CatalogDropdownProps) {
-  const [open, setOpen] = useState(false)
-  const [query, setQuery] = useState('')
-  const rootRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
-  const sections = useMemo(() => filteredCatalogSections(query), [query])
-  const firstSelectableItem = sections.flatMap((section) => section.items).find((item) => item.exampleId)
-
-  useEffect(() => {
-    if (!open) {
-      return
-    }
-
-    function handlePointerDown(event: PointerEvent) {
-      if (!rootRef.current?.contains(event.target as Node)) {
-        setOpen(false)
-      }
-    }
-
-    document.addEventListener('pointerdown', handlePointerDown)
-
-    return () => document.removeEventListener('pointerdown', handlePointerDown)
-  }, [open])
-
-  function openSearch() {
-    setOpen(true)
-    setQuery('')
-    window.setTimeout(() => inputRef.current?.focus(), 0)
-  }
-
-  function closeSearch() {
-    setOpen(false)
-    setQuery('')
-  }
-
-  function selectItem(item: CatalogItem) {
-    if (!item.exampleId) {
-      return
-    }
-
-    onSelectExample(item.exampleId)
-    closeSearch()
-  }
-
-  function handleSearchKeyDown(event: KeyboardEvent<HTMLInputElement>) {
-    if (event.key === 'Escape') {
-      event.preventDefault()
-      closeSearch()
-    }
-
-    if (event.key === 'Enter' && firstSelectableItem) {
-      event.preventDefault()
-      selectItem(firstSelectableItem)
-    }
-  }
-
-  return (
-    <div className="catalog-picker" ref={rootRef}>
-      {open ? (
-        <input
-          ref={inputRef}
-          className="catalog-search"
-          value={query}
-          role="combobox"
-          aria-autocomplete="list"
-          aria-controls="catalog-list"
-          aria-expanded="true"
-          aria-label="Search cheatsheet catalog"
-          placeholder="Search catalog"
-          onChange={(event) => setQuery(event.currentTarget.value)}
-          onKeyDown={handleSearchKeyDown}
-        />
-      ) : (
-        <button
-          type="button"
-          className="catalog-trigger"
-          aria-haspopup="listbox"
-          aria-expanded="false"
-          onClick={openSearch}
-        >
-          <span>{activeLabel}</span>
-          <span className="catalog-caret" aria-hidden="true" />
-        </button>
-      )}
-
-      {open ? (
-        <div className="catalog-menu" id="catalog-list" role="listbox" aria-label="Cheatsheet catalog">
-          {sections.length ? (
-            sections.map((section) => (
-              <div className="catalog-section" key={section.id}>
-                <div className="catalog-parent">{section.label}</div>
-                <div className="catalog-children">
-                  {section.items.map((item) => {
-                    const selected = item.exampleId === activeExampleId
-                    const disabled = !item.exampleId
-
-                    return (
-                      <button
-                        key={item.id}
-                        type="button"
-                        className={`catalog-item${selected ? ' selected' : ''}`}
-                        aria-disabled={disabled}
-                        aria-selected={selected}
-                        disabled={disabled}
-                        role="option"
-                        onClick={() => selectItem(item)}
-                      >
-                        {item.label}
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-            ))
-          ) : (
-            <div className="catalog-empty">No matches</div>
-          )}
-        </div>
-      ) : null}
-    </div>
-  )
-}
-
-function CheatsheetSummary() {
-  return (
-    <p className="cheatsheet-summary">
-      FlashAttention equations, masked attention, and code side by side.
-    </p>
-  )
-}
-
-function AttentionExplorerPage() {
-  const [activeExampleId, setActiveExampleId] = useState(examples[0].id)
-  const [hoveredLineId, setHoveredLineId] = useState<string | null>(null)
-  const [pinnedLineId, setPinnedLineId] = useState<string | null>(null)
-  const [attentionMaskEnabled, setAttentionMaskEnabled] = useState(false)
-
-  const activeExample = examples.find((example) => example.id === activeExampleId) ?? examples[0]
-  const attentionMode: AttentionMode = attentionMaskEnabled ? 'masked' : 'unmasked'
-  const activeContent = activeExample.content[attentionMode]
-  const activeLineId = pinnedLineId ?? hoveredLineId
-  const selectableRows = [
-    ...activeContent.rows,
-    ...(activeContent.notes?.flatMap((note) => note.rows) ?? []),
-  ]
-  const activeLine = selectableRows.find((line) => line.id === activeLineId)
-  const activeCodeLines = new Set(activeLine?.codeLines ?? [])
-  const codeLines = useMemo(() => highlightedCodeLines(activeContent.code), [activeContent.code])
-  const blocks = useMemo(
-    () => algorithmBlocks(activeExample, attentionMode, activeContent),
-    [activeExample, attentionMode, activeContent]
-  )
-
-  function switchExample(exampleId: string) {
-    setActiveExampleId(exampleId)
-    setHoveredLineId(null)
-    setPinnedLineId(null)
-  }
-
-  function toggleAttentionMask(enabled: boolean) {
-    setAttentionMaskEnabled(enabled)
-    setHoveredLineId(null)
-    setPinnedLineId(null)
-  }
-
-  function togglePinnedLine(lineId: string) {
-    setPinnedLineId((current) => (current === lineId ? null : lineId))
-  }
-
-  function renderSegment(segment: Segment, index: number) {
-    if (segment.kind === 'strong') {
-      return <strong key={index}>{segment.value}</strong>
-    }
-
-    if (segment.kind === 'math') {
-      return (
-        <span
-          className="algorithm-math"
-          dangerouslySetInnerHTML={{ __html: renderInlineLatex(segment.value) }}
-          key={index}
-        />
-      )
-    }
-
-    return <span key={index}>{segment.value}</span>
-  }
-
-  function renderAlgorithmRow(line: AlgorithmLine, displayNumber = line.number) {
-    const isActive = activeLine?.id === line.id
-    const isPinned = pinnedLineId === line.id
-
-    return (
-      <button
-        key={line.id}
-        type="button"
-        className={`algorithm-row${isActive ? ' active' : ''}${isPinned ? ' pinned' : ''}`}
-        onBlur={() => setHoveredLineId(null)}
-        onClick={() => togglePinnedLine(line.id)}
-        onFocus={() => setHoveredLineId(line.id)}
-        onMouseEnter={() => setHoveredLineId(line.id)}
-        onMouseLeave={() => setHoveredLineId(null)}
-      >
-        <span className="algorithm-row-number">{displayNumber ? `${displayNumber}:` : ''}</span>
-        <span
-          className="algorithm-row-body"
-          style={{ '--indent': line.indent ?? 0 } as CSSProperties}
-        >
-          {line.parts.map(renderSegment)}
-        </span>
-      </button>
-    )
-  }
-
-  return (
-    <main className="workspace" aria-label="Attention equation and code explorer">
-      <header className="cheatsheet-header">
-        <div className="cheatsheet-title">
-          <h1>Broq Cheatsheet</h1>
-        </div>
-        <CatalogDropdown
-          activeLabel={activeExample.label}
-          activeExampleId={activeExample.id}
-          onSelectExample={switchExample}
-        />
-      </header>
-
-      <CheatsheetSummary />
-
-      <section className="main-panel" aria-label={`${activeExample.label} equations and code`}>
-        <div className="region math-region">
-          {blocks.map((block, index) => (
-            <article
-              className="algorithm-paper"
-              key={block.id}
-              aria-label={`${activeExample.label} ${block.title}`}
-            >
-              <header className="algorithm-header">
-                <strong>Algorithm {index + 1}</strong>
-                <h2>
-                  {activeExample.algorithmTitle} {block.title}
-                </h2>
-              </header>
-              <p className="algorithm-require">
-                <strong>Require:</strong> {block.require.map(renderSegment)}
-              </p>
-              <div className="algorithm-lines">
-                {block.rows.map((line, rowIndex) => renderAlgorithmRow(line, rowIndex + 1))}
-              </div>
-            </article>
-          ))}
-
-          {activeContent.notes?.map((note) => (
-            <article
-              className="algorithm-paper latex-block"
-              key={note.id}
-              aria-label={`${activeExample.label} ${note.title}`}
-            >
-              <header className="algorithm-header">
-                <strong>LaTeX</strong>
-                <h2>{note.title}</h2>
-              </header>
-              {note.require ? (
-                <p className="algorithm-require">
-                  <strong>{note.requireLabel ?? 'Given'}:</strong> {note.require.map(renderSegment)}
-                </p>
-              ) : null}
-              <div className="algorithm-lines">
-                {note.rows.map((line, rowIndex) => renderAlgorithmRow(line, rowIndex + 1))}
-              </div>
-            </article>
-          ))}
-        </div>
-
-        <pre className="region code-region" aria-label={`${activeExample.label} code`}>
-          <code>
-            {codeLines.map((line) => (
-              <span
-                className={`code-line${activeCodeLines.has(line.number) ? ' active' : ''}`}
-                data-line={line.number}
-                key={line.number}
-              >
-                <span className="line-number">{line.number}</span>
-                <span
-                  className="line-code"
-                  dangerouslySetInnerHTML={{ __html: line.html }}
-                />
-              </span>
-            ))}
-          </code>
-        </pre>
-      </section>
-
-      <section className="control-strip" aria-label="Attention controls">
-        <label className={`checkbox-control${attentionMaskEnabled ? ' active' : ''}`}>
-          <input
-            type="checkbox"
-            checked={attentionMaskEnabled}
-            onChange={(event) => toggleAttentionMask(event.currentTarget.checked)}
-          />
-          <span className="toggle-copy">Attention mask</span>
-        </label>
-      </section>
-
-      <nav className="example-nav" aria-label="Attention variant selector" role="tablist">
-        {examples.map((example) => (
-          <button
-            key={example.id}
-            type="button"
-            className={example.id === activeExample.id ? 'active' : ''}
-            aria-current={example.id === activeExample.id ? 'page' : undefined}
-            aria-selected={example.id === activeExample.id}
-            onClick={() => switchExample(example.id)}
-            role="tab"
-          >
-            {example.label}
-          </button>
-        ))}
-      </nav>
-    </main>
-  )
-}
-
-export default AttentionExplorerPage

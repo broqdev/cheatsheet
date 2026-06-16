@@ -220,17 +220,24 @@ button:focus-visible {
   display: flex;
   width: 100%;
   min-height: 50px;
-  align-items: stretch;
-  gap: 0;
+  align-items: flex-end;
+  gap: 14px;
   flex: 0 0 50px;
+  overflow: hidden;
+  padding: 0 2px;
+}
+
+.example-nav-track {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 49px;
+  align-items: flex-end;
+  gap: 22px;
   overflow-x: auto;
   overflow-y: hidden;
-  border: 1px solid rgba(24, 32, 30, 0.34);
-  border-radius: 8px;
-  padding: 3px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(240, 247, 245, 0.86));
-  box-shadow: 4px 4px 0 rgba(0, 127, 112, 0.1);
+  padding: 0 1px;
+  background: transparent;
   scrollbar-width: none;
   white-space: nowrap;
 }
@@ -295,16 +302,16 @@ button:focus-visible {
   cursor: pointer;
 }
 
-.example-nav::-webkit-scrollbar {
+.example-nav-track::-webkit-scrollbar {
   display: none;
 }
 
 .example-nav button {
   position: relative;
   min-height: 42px;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  padding: 0 18px;
+  border: 0;
+  border-radius: 0;
+  padding: 0 0 10px;
   background: transparent;
   color: var(--muted);
   cursor: pointer;
@@ -312,31 +319,35 @@ button:focus-visible {
   font-weight: 800;
   letter-spacing: 0;
   transition:
-    background 160ms ease,
-    border-color 160ms ease,
+    transform 160ms ease,
     color 160ms ease,
-    box-shadow 160ms ease;
+    opacity 160ms ease;
 }
 
-.example-nav button + button {
-  margin-left: 3px;
+.example-nav button::after {
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 3px;
+  background: transparent;
+  content: "";
+  transition: background 160ms ease;
 }
 
 .example-nav button:hover {
-  border-color: rgba(0, 127, 112, 0.2);
-  background: rgba(255, 255, 255, 0.66);
   color: var(--ink);
+  transform: translateY(-1px);
 }
 
 .example-nav button.active {
-  border-color: rgba(0, 127, 112, 0.48);
-  background: rgba(255, 255, 255, 0.96);
   color: var(--ink);
-  box-shadow:
-    inset 0 -3px 0 var(--accent),
-    0 1px 0 rgba(255, 255, 255, 0.8);
   font-size: 1.16rem;
   font-weight: 900;
+}
+
+.example-nav button.active::after {
+  background: var(--accent);
 }
 
 .main-panel {
@@ -361,8 +372,53 @@ button:focus-visible {
 }
 
 .region {
+  position: relative;
   min-width: 0;
   min-height: 0;
+}
+
+.region-copy-button {
+  --copy-shift-x: 0px;
+  --copy-shift-y: 0px;
+  position: sticky;
+  top: -16px;
+  z-index: 3;
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  margin: -38px 8px 6px auto;
+  border: 1px solid rgba(24, 32, 30, 0.34);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--ink);
+  cursor: pointer;
+  box-shadow: 2px 2px 0 rgba(0, 127, 112, 0.1);
+  transition:
+    background 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease,
+    transform 150ms ease;
+  transform: translate(var(--copy-shift-x), var(--copy-shift-y));
+}
+
+.region-copy-button:hover {
+  --copy-shift-y: -1px;
+  border-color: rgba(0, 127, 112, 0.56);
+  background: #ffffff;
+  color: var(--accent);
+}
+
+.region-copy-button svg {
+  display: block;
+  flex-shrink: 0;
+}
+
+.math-region .region-copy-button {
+  --copy-shift-x: 16px;
+  top: -14px;
+  justify-self: end;
+  margin-right: -14px;
 }
 
 .math-region {
@@ -427,6 +483,8 @@ button:focus-visible {
   color: inherit;
   cursor: pointer;
   text-align: left;
+  touch-action: manipulation;
+  user-select: none;
   transition:
     background 150ms ease,
     border-color 150ms ease;
@@ -438,7 +496,7 @@ button:focus-visible {
   background: rgba(0, 127, 112, 0.09);
 }
 
-.algorithm-row.pinned {
+.algorithm-row.selected {
   border-color: var(--accent);
 }
 
@@ -464,7 +522,6 @@ button:focus-visible {
 }
 
 .code-region {
-  margin: 0;
   overflow-x: hidden;
   overflow-y: auto;
   min-height: 0;
@@ -481,6 +538,29 @@ button:focus-visible {
     monospace;
   font-size: 0.86rem;
   line-height: 1.64;
+}
+
+.code-region .region-copy-button {
+  border-color: rgba(232, 240, 237, 0.2);
+  background: rgba(17, 24, 22, 0.9);
+  color: #e8f0ed;
+  box-shadow: 2px 2px 0 rgba(255, 176, 0, 0.18);
+}
+
+.code-region .region-copy-button:hover {
+  border-color: rgba(255, 176, 0, 0.72);
+  background: rgba(26, 36, 33, 0.96);
+  color: var(--focus);
+}
+
+.code-block {
+  margin: 0;
+  color: inherit;
+  font: inherit;
+}
+
+.code-block code {
+  font: inherit;
 }
 
 .code-line {
@@ -602,8 +682,13 @@ button:focus-visible {
   }
 
   .example-nav {
-    min-height: 48px;
-    flex-basis: 48px;
+    min-height: 46px;
+    flex-basis: 46px;
+    gap: 8px;
+  }
+
+  .example-nav-track {
+    min-height: 42px;
   }
 
   .control-strip {
@@ -612,13 +697,13 @@ button:focus-visible {
   }
 
   .example-nav button {
-    min-height: 40px;
+    min-height: 34px;
     padding: 0 14px;
-    font-size: 0.94rem;
+    font-size: 0.9rem;
   }
 
   .example-nav button.active {
-    font-size: 1.05rem;
+    font-size: 0.98rem;
   }
 
   .main-panel {
