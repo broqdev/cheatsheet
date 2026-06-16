@@ -1,7 +1,9 @@
+export type ToggleDelta = 'mask' | 'dropout'
+
 export type Segment =
-  | { kind: 'text'; value: string }
-  | { kind: 'math'; value: string }
-  | { kind: 'strong'; value: string }
+  | { kind: 'text'; value: string; delta?: ToggleDelta }
+  | { kind: 'math'; value: string; delta?: ToggleDelta }
+  | { kind: 'strong'; value: string; delta?: ToggleDelta }
 
 export type AlgorithmLine = {
   id: string
@@ -30,9 +32,12 @@ export type AttentionContent = {
 
 export type AttentionExample = {
   id: string
+  urlTag: string
   label: string
+  description: string
   algorithmTitle: string
   content: Record<AttentionMode, AttentionContent>
+  dropoutContent?: Partial<Record<AttentionMode, AttentionContent>>
 }
 
 export type CatalogItem = {
@@ -48,11 +53,10 @@ export type CatalogSection = {
 }
 
 export type AlgorithmBlock = {
-  id: 'forward' | 'backward'
+  id: string
   title: string
   require: Segment[]
   rows: AlgorithmLine[]
 }
 
 export type CopyTarget = 'latex' | 'code'
-

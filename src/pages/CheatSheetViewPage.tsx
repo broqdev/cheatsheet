@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { type CSSProperties, useEffect, useMemo, useRef, useState } from 'react'
 import { AlgorithmPapers } from '../features/cheat-sheet-view/components/AlgorithmPapers'
 import { AttentionControls } from '../features/cheat-sheet-view/components/AttentionControls'
 import { CatalogDropdown } from '../features/cheat-sheet-view/components/CatalogDropdown'
@@ -11,24 +11,69 @@ import { copyTextToClipboard } from '../features/cheat-sheet-view/lib/clipboard'
 import { highlightedCodeLines } from '../features/cheat-sheet-view/lib/highlightCode'
 import { latexDocument } from '../features/cheat-sheet-view/lib/latexDocument'
 import { renderInlineLatex } from '../features/cheat-sheet-view/lib/renderLatex'
+import { toggleDeltaColors } from '../features/cheat-sheet-view/lib/toggleDeltas'
 import type {
   AlgorithmLine,
+  AttentionExample,
   AttentionMode,
   CopyTarget,
   Segment,
 } from '../features/cheat-sheet-view/model'
 
+function normalizeUrlTag(value: string) {
+  const hashValue = value.startsWith('#') ? value.slice(1) : value
+  let decodedValue = hashValue
+
+  try {
+    decodedValue = decodeURIComponent(hashValue)
+  } catch {
+    decodedValue = hashValue
+  }
+
+  return decodedValue
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+}
+
+function urlTagsForExample(example: AttentionExample) {
+  return [example.id, example.urlTag, example.label].map(normalizeUrlTag)
+}
+
+function exampleFromUrlTag(value: string) {
+  const tag = normalizeUrlTag(value)
+
+  if (!tag) {
+    return undefined
+  }
+
+  return examples.find((example) => urlTagsForExample(example).includes(tag))
+}
+
+function canonicalHashForExample(example: AttentionExample) {
+  return `#${encodeURIComponent(normalizeUrlTag(example.urlTag))}`
+}
+
 function CheatSheetViewPage() {
-  const [activeExampleId, setActiveExampleId] = useState(examples[0].id)
+  const [activeExampleId, setActiveExampleId] = useState(
+    () => exampleFromUrlTag(window.location.hash)?.id ?? examples[0].id
+  )
   const [hoveredLineId, setHoveredLineId] = useState<string | null>(null)
   const [selectedLineId, setSelectedLineId] = useState<string | null>(null)
   const [attentionMaskEnabled, setAttentionMaskEnabled] = useState(false)
+  const [dropoutEnabled, setDropoutEnabled] = useState(false)
   const [copiedTarget, setCopiedTarget] = useState<CopyTarget | null>(null)
   const codeRegionRef = useRef<HTMLDivElement>(null)
 
   const activeExample = examples.find((example) => example.id === activeExampleId) ?? examples[0]
   const attentionMode: AttentionMode = attentionMaskEnabled ? 'masked' : 'unmasked'
-  const activeContent = activeExample.content[attentionMode]
+  const dropoutContent = activeExample.dropoutContent?.[attentionMode]
+  const dropoutAvailable = activeExample.id === 'flash1' && Boolean(dropoutContent)
+  const activeContent =
+    dropoutEnabled && dropoutAvailable && dropoutContent
+      ? dropoutContent
+      : activeExample.content[attentionMode]
   const activeLineId = selectedLineId ?? hoveredLineId
   const selectableRows = [
     ...activeContent.rows,
@@ -46,14 +91,62 @@ function CheatSheetViewPage() {
     [activeExample, activeContent.notes, blocks]
   )
 
-  function switchExample(exampleId: string) {
-    setActiveExampleId(exampleId)
+  useEffect(() => {
+    function syncExampleFromUrlTag() {
+      setActiveExampleId(exampleFromUrlTag(window.location.hash)?.id ?? examples[0].id)
+      setDropoutEnabled(false)
+      setHoveredLineId(null)
+      setSelectedLineId(null)
+    }
+
+    window.addEventListener('hashchange', syncExampleFromUrlTag)
+    window.addEventListener('popstate', syncExampleFromUrlTag)
+
+    return () => {
+      window.removeEventListener('hashchange', syncExampleFromUrlTag)
+      window.removeEventListener('popstate', syncExampleFromUrlTag)
+    }
+  }, [])
+
+  function resetExampleState() {
+    setDropoutEnabled(false)
     setHoveredLineId(null)
     setSelectedLineId(null)
   }
 
+  function switchExample(exampleId: string) {
+    const nextExample = examples.find((example) => example.id === exampleId)
+
+    if (!nextExample) {
+      return
+    }
+
+    setActiveExampleId(nextExample.id)
+    resetExampleState()
+
+    const nextHash = canonicalHashForExample(nextExample)
+
+    if (window.location.hash !== nextHash) {
+      window.history.pushState(
+        null,
+        '',
+        `${window.location.pathname}${window.location.search}${nextHash}`
+      )
+    }
+  }
+
   function toggleAttentionMask(enabled: boolean) {
     setAttentionMaskEnabled(enabled)
+    setHoveredLineId(null)
+    setSelectedLineId(null)
+  }
+
+  function toggleDropout(enabled: boolean) {
+    if (enabled && !dropoutAvailable) {
+      return
+    }
+
+    setDropoutEnabled(enabled)
     setHoveredLineId(null)
     setSelectedLineId(null)
   }
@@ -117,21 +210,35 @@ function CheatSheetViewPage() {
   }
 
   function renderSegment(segment: Segment, index: number) {
+    const deltaClassName = segment.delta ? ' toggle-delta' : ''
+    const deltaStyle = segment.delta
+      ? ({ '--toggle-delta-color': toggleDeltaColors[segment.delta] } as CSSProperties)
+      : undefined
+
     if (segment.kind === 'strong') {
-      return <strong key={index}>{segment.value}</strong>
+      return (
+        <strong className={segment.delta ? 'toggle-delta' : undefined} key={index} style={deltaStyle}>
+          {segment.value}
+        </strong>
+      )
     }
 
     if (segment.kind === 'math') {
       return (
         <span
-          className="algorithm-math"
+          className={`algorithm-math${deltaClassName}`}
           dangerouslySetInnerHTML={{ __html: renderInlineLatex(segment.value) }}
           key={index}
+          style={deltaStyle}
         />
       )
     }
 
-    return <span key={index}>{segment.value}</span>
+    return (
+      <span className={segment.delta ? 'toggle-delta' : undefined} key={index} style={deltaStyle}>
+        {segment.value}
+      </span>
+    )
   }
 
   return (
@@ -147,7 +254,7 @@ function CheatSheetViewPage() {
         />
       </header>
 
-      <CheatsheetSummary />
+      <CheatsheetSummary description={activeExample.description} />
 
       <section
         className="main-panel"
@@ -181,6 +288,10 @@ function CheatSheetViewPage() {
 
       <AttentionControls
         attentionMaskEnabled={attentionMaskEnabled}
+        attentionMaskLabel={activeExample.id === 'flash2' || activeExample.id === 'flash3' ? 'Causal Attention' : 'Attention mask'}
+        dropoutAvailable={dropoutAvailable}
+        dropoutEnabled={dropoutEnabled}
+        onToggleDropout={toggleDropout}
         onToggleAttentionMask={toggleAttentionMask}
       />
 

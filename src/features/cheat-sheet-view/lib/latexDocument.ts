@@ -1,15 +1,26 @@
 import type { AlgorithmBlock, AlgorithmLine, AttentionExample, LatexBlock, Segment } from '../model'
+import { toggleDeltaColors } from './toggleDeltas'
+
+function colorizeLatex(segment: Segment, value: string) {
+  if (!segment.delta) {
+    return value
+  }
+
+  return `\\textcolor{${toggleDeltaColors[segment.delta]}}{${value}}`
+}
 
 function segmentToLatex(segment: Segment) {
   if (segment.kind === 'math') {
-    return `$${segment.value}$`
+    return segment.delta
+      ? `$\\textcolor{${toggleDeltaColors[segment.delta]}}{${segment.value}}$`
+      : `$${segment.value}$`
   }
 
   if (segment.kind === 'strong') {
-    return `\\textbf{${segment.value}}`
+    return colorizeLatex(segment, `\\textbf{${segment.value}}`)
   }
 
-  return segment.value
+  return colorizeLatex(segment, segment.value)
 }
 
 function segmentsToLatex(segments: Segment[]) {
@@ -53,4 +64,3 @@ export function latexDocument(
     ...(notes?.map(noteToLatex) ?? []),
   ].join('\n\n')
 }
-

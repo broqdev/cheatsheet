@@ -1,5 +1,17 @@
-import type { Segment } from '../model'
+import type { Segment, ToggleDelta } from '../model'
 
-export const text = (value: string): Segment => ({ kind: 'text', value })
-export const math = (value: string): Segment => ({ kind: 'math', value })
-export const strong = (value: string): Segment => ({ kind: 'strong', value })
+export const text = (value: string, delta?: ToggleDelta): Segment => ({
+  kind: 'text',
+  value,
+  delta,
+})
+export const math = (value: string, delta?: ToggleDelta): Segment => ({
+  kind: 'math',
+  value,
+  delta,
+})
+export const strong = (value: string, delta?: ToggleDelta): Segment => ({
+  kind: 'strong',
+  value,
+  delta,
+})

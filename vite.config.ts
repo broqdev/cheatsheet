@@ -1,3 +1,4 @@
+import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig, type Plugin } from 'vite'
 
@@ -8,7 +9,7 @@ const base = process.env.VITE_BASE_PATH ?? githubPagesBase
 
 const siteTitle = 'Broq Cheatsheet'
 const siteDescription =
-  'Interactive FlashAttention reference that links LaTeX equations to the matching PyTorch and Triton-style code.'
+  'Broq Cheatsheet maps naive attention, FlashAttention-1, FlashAttention-2, and FlashAttention-3 equations to the PyTorch and Triton-style code beside them.'
 
 function withTrailingSlash(value: string) {
   return value.endsWith('/') ? value : `${value}/`
@@ -41,6 +42,7 @@ function seoPlugin(): Plugin {
     '@context': 'https://schema.org',
     '@type': ['WebApplication', 'LearningResource'],
     name: siteTitle,
+    alternateName: 'Attention Math and Code',
     description: siteDescription,
     url: canonicalUrl,
     applicationCategory: 'EducationalApplication',
@@ -50,13 +52,20 @@ function seoPlugin(): Plugin {
     learningResourceType: 'Interactive cheatsheet',
     about: [
       { '@type': 'Thing', name: 'FlashAttention' },
+      { '@type': 'Thing', name: 'FlashAttention-1' },
+      { '@type': 'Thing', name: 'FlashAttention-2' },
+      { '@type': 'Thing', name: 'FlashAttention-3' },
+      { '@type': 'Thing', name: 'Naive attention' },
       { '@type': 'Thing', name: 'Attention mechanism' },
       { '@type': 'Thing', name: 'Online softmax' },
-      { '@type': 'Thing', name: 'Triton' },
+      { '@type': 'Thing', name: 'Triton kernels' },
     ],
     teaches: [
+      'Naive attention forward and backward passes',
       'FlashAttention forward pass',
       'FlashAttention backward pass',
+      'FlashAttention-2 work partitioning',
+      'FlashAttention-3 warp specialization',
       'Masked attention',
       'Softmax backward pass',
     ],
@@ -87,5 +96,5 @@ function seoPlugin(): Plugin {
 
 export default defineConfig({
   base,
-  plugins: [react(), seoPlugin()],
+  plugins: [tailwindcss(), react(), seoPlugin()],
 })
