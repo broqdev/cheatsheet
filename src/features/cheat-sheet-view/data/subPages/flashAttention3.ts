@@ -1,14 +1,15 @@
 import type { AttentionExample, Segment } from '../../model'
-import flashAttention3Code from './code/flashAttention3.py?raw'
-import causalFlashAttention3Code from './code/causalFlashAttention3.py?raw'
-import flashAttention3HopperFp8Code from './code/flashAttention3HopperFp8.py?raw'
-import causalFlashAttention3HopperFp8Code from './code/causalFlashAttention3HopperFp8.py?raw'
+import flashAttention3Code from './code/flashAttention3Gluon.py?raw'
+import causalFlashAttention3Code from './code/causalFlashAttention3Gluon.py?raw'
+import flashAttention3HopperFp8Code from './code/flashAttention3GluonHopperFp8.py?raw'
+import causalFlashAttention3HopperFp8Code from './code/causalFlashAttention3GluonHopperFp8.py?raw'
 import { defineAttentionContent, type AlgorithmLineSpec } from '../../lib/codeRefs'
 import { math, strong, text } from '../../lib/segments'
 
 const mappedCodeRefIds = new Set([
   'flash3-cta-forward-label',
   'flash3-cta-pipeline',
+  'flash3-cta-producer-registers',
   'flash3-cta-load-q',
   'flash3-cta-commit-q',
   'flash3-cta-producer-loop',
@@ -18,6 +19,7 @@ const mappedCodeRefIds = new Set([
   'flash3-cta-init-state',
   'flash3-cta-wait-q',
   'flash3-cta-consumer-loop',
+  'flash3-cta-consumer-registers',
   'flash3-cta-wait-k',
   'flash3-cta-score',
   'flash3-cta-rowmax',
@@ -28,6 +30,7 @@ const mappedCodeRefIds = new Set([
   'flash3-cta-normalize',
   'flash3-cta-write',
   'flash3-consumer-forward-label',
+  'flash3-consumer-registers',
   'flash3-consumer-init',
   'flash3-consumer-wait-qk0',
   'flash3-consumer-score-cur',
@@ -825,7 +828,7 @@ function withHopperFp8Rows(row: AlgorithmLineSpec): AlgorithmLineSpec {
           text('Cast '),
           math(String.raw`\tilde P_i^{(j)}`, 'fp8'),
           text(' to ', 'fp8'),
-          math(String.raw`\mathrm{tl.float8\_e5m2}`, 'fp8'),
+          math(String.raw`\mathrm{gl.float8e5}`, 'fp8'),
           text(' and compute '),
           math(String.raw`O_i=\operatorname{diag}(\exp(m_i^{\mathrm{old}}-m_i))^{-1}O_i+\tilde P_i^{(j)}\widehat V_j`, 'fp8'),
           text(' (RS-GEMM). Commit and wait; ', 'fp8'),
@@ -886,7 +889,7 @@ function withHopperFp8Rows(row: AlgorithmLineSpec): AlgorithmLineSpec {
         ...row,
         parts: [
           text('Cast the probability tile to ', 'fp8'),
-          math(String.raw`\mathrm{tl.float8\_e5m2}`, 'fp8'),
+          math(String.raw`\mathrm{gl.float8e5}`, 'fp8'),
           text(' and compute the FP8 output update with ', 'fp8'),
           math(row.id === 'flash3-consumer-output-prev'
             ? String.raw`\tilde P_{\mathrm{cur}}\widehat V_{j-1}`
