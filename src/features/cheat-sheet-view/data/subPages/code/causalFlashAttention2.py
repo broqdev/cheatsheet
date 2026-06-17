@@ -354,9 +354,9 @@ def flash2_bwd_causal(
     tl.static_assert(BLOCK_M == BLOCK_N)
 
 # @ref flash2-causal-bwd-kv-loop
-    # Program axis 0 owns one K/V block for dK_j and dV_j.
-    pid_n = tl.program_id(0)
-    start_n = pid_n * BLOCK_N
+    # One program id owns K/V block j for dK_j/dV_j and Q block i for dQ_i.
+    pid = tl.program_id(0)
+    start_n = pid * BLOCK_N
     offs_n = start_n + tl.arange(0, BLOCK_N)
     offs_d = tl.arange(0, HEAD_DIM)
 # @end
@@ -420,9 +420,8 @@ def flash2_bwd_causal(
 # @end
 
 # @ref flash2-causal-bwd-dq-loop flash2-causal-bwd-end-dq-loop
-    # Program axis 1 owns one Q block for dQ_i.
-    pid_m = tl.program_id(1)
-    start_m = pid_m * BLOCK_M
+    # Reuse the same program id for the matching Q block.
+    start_m = pid * BLOCK_M
     offs_m = start_m + tl.arange(0, BLOCK_M)
 # @end
 # @ref flash2-causal-bwd-end-dq-loop

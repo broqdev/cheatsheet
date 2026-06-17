@@ -8,6 +8,7 @@ type AlgorithmPapersProps = {
   blocks: AlgorithmBlock[]
   latexCopied: boolean
   notes: LatexBlock[] | undefined
+  prelude: LatexBlock[] | undefined
   onCopyLatex: () => void
   onLineActivate: (line: AlgorithmLine) => void
   onLineFocus: (lineId: string) => void
@@ -73,6 +74,7 @@ export function AlgorithmPapers({
   blocks,
   latexCopied,
   notes,
+  prelude,
   onCopyLatex,
   onLineActivate,
   onLineFocus,
@@ -99,6 +101,22 @@ export function AlgorithmPapers({
   return (
     <div className="region math-region">
       <CopyButton copied={latexCopied} label="Copy LaTeX" onCopy={onCopyLatex} />
+
+      {prelude?.map((part) => (
+        <article
+          className="algorithm-paper latex-block"
+          key={part.id}
+          aria-label={`${activeExample.label} ${part.title}`}
+        >
+          <header className="algorithm-header">
+            <strong>{part.title}</strong>
+            {part.require ? <h2>{part.require.map(renderSegment)}</h2> : null}
+          </header>
+          <div className="algorithm-lines">
+            {part.rows.map((line, rowIndex) => renderAlgorithmRow(line, rowIndex + 1))}
+          </div>
+        </article>
+      ))}
 
       {blocks.map((block, index) => (
         <article

@@ -86,6 +86,7 @@ class Flash3Config:
     k_layout: gl.constexpr
     v_layout: gl.constexpr
     o_layout: gl.constexpr
+    row_layout: gl.constexpr
     mma_layout: gl.constexpr
     q_operand_layout: gl.constexpr
     p_operand_layout: gl.constexpr
@@ -106,6 +107,7 @@ class Flash3Config:
         self.k_layout = gl.constexpr(gl.NVMMASharedLayout.get_default_for([BLOCK_N, HEAD_DIM], dtype))
         self.v_layout = gl.constexpr(gl.NVMMASharedLayout.get_default_for([BLOCK_N, HEAD_DIM], dtype))
         self.o_layout = gl.constexpr(gl.NVMMASharedLayout.get_default_for([BLOCK_M, HEAD_DIM], dtype))
+        self.row_layout = gl.constexpr(gl.NVMMASharedLayout.get_default_for([BLOCK_M, 1], gl.float32))
         self.mma_layout = gl.constexpr(
             gl.NVMMADistributedLayout(
                 version=[3, 0],
@@ -141,6 +143,24 @@ def get_program(config, tile_id):
     off_h = off_hz - off_z * config.H
     base_y = off_z * (config.N_CTX * config.H) + off_h * config.N_CTX
     return Flash3Program(pid_m, off_hz, base_y, base_y + pid_m * config.BLOCK_M)
+
+
+@gluon.aggregate
+class Flash3BwdProgram:
+    start_n: gl.tensor
+    off_hz: gl.tensor
+    base_token: gl.tensor
+    base_vec: gl.tensor
+
+
+@gluon.jit
+def get_bwd_program(config, tile_id):
+    num_k_tiles = gl.cdiv(config.N_CTX, config.BLOCK_N)
+    off_hz = tile_id // num_k_tiles
+    pid_n = tile_id - off_hz * num_k_tiles
+    base_token = off_hz * config.N_CTX
+    base_vec = base_token * config.HEAD_DIM
+    return Flash3BwdProgram(pid_n * config.BLOCK_N, off_hz, base_token, base_vec)
 
 
 @gluon.jit
@@ -199,7 +219,7 @@ def _flash3_fwd_load(config, channels, descs):
 
 # @ref flash3-consumer-forward-label
 @gluon.jit
-def _flash3_fwd_compute(config, channels, descs):
+def _flash3_fwd_compute(config, channels, descs, M):
     q_chnl, k_chnl, v_chnl, p_chnl, o_chnl = channels
     q_state = q_chnl.state()
     k_state = k_chnl.state()
@@ -208,18 +228,26 @@ def _flash3_fwd_compute(config, channels, descs):
     o_state = o_chnl.state()
 # @end
 
-# @ref flash3-cta-init-state flash3-consumer-init
-    m_i = gl.full([config.BLOCK_M], -float("inf"), gl.float32)
-    l_i = gl.full([config.BLOCK_M], 0.0, gl.float32)
-    o_acc = warpgroup_mma_init(gl.zeros((config.BLOCK_M, config.HEAD_DIM), dtype=gl.float32, layout=config.mma_layout))
-# @end
-
 # @ref flash3-cta-consumer-loop flash3-consumer-loop
     num_tiles = gl.cdiv(config.N_CTX, config.BLOCK_M) * config.Z * config.H
     for tile_id in range(gl.program_id(0), num_tiles, config.NUM_SMS):
         prog = get_program(config, tile_id)
         lo, hi = prog.loop_bounds(config)
+# @end
+
+# @ref flash3-cta-init-state flash3-consumer-init
+        # Persistent CTAs visit multiple output tiles; each tile needs a fresh
+        # online-softmax state or rows leak state from the previous tile.
+        m_i = gl.full([config.BLOCK_M], -float("inf"), gl.float32)
+        l_i = gl.full([config.BLOCK_M], 0.0, gl.float32)
+        o_acc = warpgroup_mma_init(gl.zeros((config.BLOCK_M, config.HEAD_DIM), dtype=gl.float32, layout=config.mma_layout))
+# @end
+
+# @ref flash3-cta-wait-q flash3-consumer-wait-qk0
         q_smem, q_empty, q_state = q_chnl.consumer_acquire(q_state)
+# @end
+
+# @ref flash3-cta-wait-k flash3-consumer-wait-kj
         k_smem, k_empty, k_state = k_chnl.consumer_acquire(k_state)
 # @end
 
@@ -242,7 +270,7 @@ def _flash3_fwd_compute(config, channels, descs):
 
 # @ref flash3-fwd-causal-mask
         q_rows = prog.start_m * config.BLOCK_M + gl.arange(0, config.BLOCK_M)[:, None]
-        k_cols = gl.arange(0, config.BLOCK_N)[None, :]
+        k_cols = lo + gl.arange(0, config.BLOCK_N)[None, :]
         s_cur = gl.where(q_rows >= k_cols, s_cur, -float("inf"))
 # @end
 
@@ -285,6 +313,11 @@ def _flash3_fwd_compute(config, channels, descs):
             qk_next = warpgroup_mma_wait(num_outstanding=0, deps=(qk_next,))
 # @end
 
+# @ref flash3-consumer-release-buffer
+            fence_async_shared()
+            mbarrier.arrive(k_empty)
+# @end
+
 # @ref flash3-consumer-online-next
             s_next = qk_next * config.qk_scale
 # @end
@@ -300,6 +333,10 @@ def _flash3_fwd_compute(config, channels, descs):
 # @end
 
 # @ref flash3-consumer-rescale-output
+            # The previous PV WGMMA must finish before its accumulator is
+            # rescaled into the new online-softmax frame.
+            o_acc = warpgroup_mma_wait(num_outstanding=0, deps=(o_acc,))
+            mbarrier.arrive(v_empty)
             o_acc = o_acc * gl.exp2(m_i - m_next)[:, None]
             l_i = l_i * gl.exp2(m_i - m_next) + gl.sum(p_next, axis=1)
             m_i = m_next
@@ -309,20 +346,20 @@ def _flash3_fwd_compute(config, channels, descs):
             p_cur = p_next
 # @end
 
-# @ref flash3-consumer-wait-vlast
-        v_smem, v_empty, v_state = v_chnl.consumer_acquire(v_state)
-# @end
-
-# @ref flash3-consumer-output-last
-        p_smem, p_ready, p_state = p_chnl.producer_acquire(p_state)
-        p_smem.store(p_cur.to(config.dtype))
-        fence_async_shared()
-        mbarrier.arrive(p_ready)
-        o_acc = wgmma_pv(config, p_smem, v_smem, o_acc, use_acc=True)
-        o_acc = warpgroup_mma_wait(num_outstanding=0, deps=(o_acc,))
+# @ref flash3-consumer-wait-vlast flash3-consumer-output-last
+            # Every K tile has a matching V tile. Keep streaming P_j V_j here
+            # so middle key blocks contribute to O_i instead of only the first
+            # and final blocks.
+            v_smem, v_empty, v_state = v_chnl.consumer_acquire(v_state)
+            p_smem, p_ready, p_state = p_chnl.producer_acquire(p_state)
+            p_smem.store(p_cur.to(config.dtype))
+            fence_async_shared()
+            mbarrier.arrive(p_ready)
+            o_acc = wgmma_pv(config, p_smem, v_smem, o_acc, use_acc=True)
 # @end
 
 # @ref flash3-cta-consumer-end
+        o_acc = warpgroup_mma_wait(num_outstanding=0, deps=(o_acc,))
         mbarrier.arrive(q_empty)
         mbarrier.arrive(v_empty)
 # @end
@@ -330,9 +367,12 @@ def _flash3_fwd_compute(config, channels, descs):
 # @ref flash3-cta-normalize flash3-consumer-epilogue
         out = o_acc / l_i[:, None]
         lse = (m_i + gl.log2(l_i)) * 0.6931471805599453
+        offs_m = prog.start_m * config.BLOCK_M + gl.arange(0, config.BLOCK_M)
 # @end
 
 # @ref flash3-cta-write flash3-consumer-epilogue
+        # FA backward reads LSE, so the forward sketch must publish it beside O.
+        gl.store(M + prog.off_hz * config.N_CTX + offs_m, lse)
         o_smem, o_ready, o_state = o_chnl.producer_acquire(o_state)
         o_smem.store(out.to(config.dtype))
         fence_async_shared()
@@ -369,119 +409,238 @@ def flash3_bwd_preprocess(O, dO, D, N_CTX: gl.constexpr, BLOCK_M: gl.constexpr, 
 
 
 @gluon.jit
-def _flash3_bwd_load(config, channels, descs):
-    kv_chnl, qdo_chnl = channels
-    desc_q, desc_k, desc_v, desc_do = descs
-    kv_state = kv_chnl.state()
-    qdo_state = qdo_chnl.state()
+def _flash3_bwd_load(config, channels, Q, K, V, dO, L, D):
+    k_chnl, v_chnl, q_chnl, do_chnl, l_chnl, d_chnl, dq_chnl = channels
+    k_state = k_chnl.state()
+    v_state = v_chnl.state()
+    q_state = q_chnl.state()
+    do_state = do_chnl.state()
+    l_state = l_chnl.state()
+    d_state = d_chnl.state()
+    num_tiles = gl.cdiv(config.N_CTX, config.BLOCK_N) * config.Z * config.H
 
 # @ref flash3-bwd-producer-loop
-    for start_n in range(0, config.N_CTX, config.BLOCK_N):
+    for tile_id in range(gl.program_id(0), num_tiles, config.NUM_SMS):
+        prog = get_bwd_program(config, tile_id)
+        offs_n = prog.start_n + gl.arange(0, config.BLOCK_N)
+        offs_d = gl.arange(0, config.HEAD_DIM)
 # @end
 
 # @ref flash3-bwd-load-kv flash3-bwd-commit-kv
-        kv_state = tma_load(desc_k, start_n, kv_chnl, kv_state)
-        kv_state = tma_load(desc_v, start_n, kv_chnl, kv_state)
+        # Producer warpgroup stages the K/V tile once for the whole dK/dV pass.
+        k_smem, k_ready, k_state = k_chnl.producer_acquire(k_state)
+        v_smem, v_ready, v_state = v_chnl.producer_acquire(v_state)
+        k_smem.store(gl.load(K + prog.base_vec + offs_n[:, None] * config.HEAD_DIM + offs_d[None, :]))
+        v_smem.store(gl.load(V + prog.base_vec + offs_n[:, None] * config.HEAD_DIM + offs_d[None, :]))
+        fence_async_shared()
+        mbarrier.arrive(k_ready)
+        mbarrier.arrive(v_ready)
 # @end
 
 # @ref flash3-bwd-load-q-do flash3-bwd-commit-q-do flash3-bwd-partition-qkv
-        qdo_state = tma_load(desc_q, 0, qdo_chnl, qdo_state)
-        qdo_state = tma_load(desc_do, 0, qdo_chnl, qdo_state)
+        # Q, dO, LSE, and D stream through for every query tile.
+        for start_m in range(0, config.N_CTX, config.BLOCK_M):
+            offs_m = start_m + gl.arange(0, config.BLOCK_M)
+            q_smem, q_ready, q_state = q_chnl.producer_acquire(q_state)
+            do_smem, do_ready, do_state = do_chnl.producer_acquire(do_state)
+            l_smem, l_ready, l_state = l_chnl.producer_acquire(l_state)
+            d_smem, d_ready, d_state = d_chnl.producer_acquire(d_state)
+            q_smem.store(gl.load(Q + prog.base_vec + offs_m[:, None] * config.HEAD_DIM + offs_d[None, :]))
+            do_smem.store(gl.load(dO + prog.base_vec + offs_m[:, None] * config.HEAD_DIM + offs_d[None, :]))
+            l_smem.store(gl.load(L + prog.base_token + offs_m)[:, None])
+            d_smem.store(gl.load(D + prog.base_token + offs_m)[:, None])
+            fence_async_shared()
+            mbarrier.arrive(q_ready)
+            mbarrier.arrive(do_ready)
+            mbarrier.arrive(l_ready)
+            mbarrier.arrive(d_ready)
 # @end
 
 
 @gluon.jit
-def _flash3_bwd_compute(config, channels):
-    kv_chnl, qdo_chnl = channels
-    kv_state = kv_chnl.state()
-    qdo_state = qdo_chnl.state()
+def _flash3_bwd_compute(config, channels, dK, dV):
+    k_chnl, v_chnl, q_chnl, do_chnl, l_chnl, d_chnl, dq_chnl = channels
+    k_state = k_chnl.state()
+    v_state = v_chnl.state()
+    q_state = q_chnl.state()
+    do_state = do_chnl.state()
+    l_state = l_chnl.state()
+    d_state = d_chnl.state()
+    dq_state = dq_chnl.state()
+    num_tiles = gl.cdiv(config.N_CTX, config.BLOCK_N) * config.Z * config.H
 
-# @ref flash3-bwd-init-dk-dv
-    dk = gl.zeros([config.BLOCK_N, config.HEAD_DIM], dtype=gl.float32)
-    dv = gl.zeros([config.BLOCK_N, config.HEAD_DIM], dtype=gl.float32)
-# @end
+    for tile_id in range(gl.program_id(0), num_tiles, config.NUM_SMS):
+        prog = get_bwd_program(config, tile_id)
+        offs_n = prog.start_n + gl.arange(0, config.BLOCK_N)
+        offs_d = gl.arange(0, config.HEAD_DIM)
 
 # @ref flash3-bwd-wait-kv
-    k_smem, k_empty, kv_state = kv_chnl.consumer_acquire(kv_state)
-    v_smem, v_empty, kv_state = kv_chnl.consumer_acquire(kv_state)
+        k_smem, k_empty, k_state = k_chnl.consumer_acquire(k_state)
+        v_smem, v_empty, v_state = v_chnl.consumer_acquire(v_state)
+        k = k_smem.load()
+        v = v_smem.load()
+# @end
+
+# @ref flash3-bwd-init-dk-dv
+        dk = gl.zeros([config.BLOCK_N, config.HEAD_DIM], dtype=gl.float32)
+        dv = gl.zeros([config.BLOCK_N, config.HEAD_DIM], dtype=gl.float32)
 # @end
 
 # @ref flash3-bwd-consumer-loop
-    for start_m in range(0, config.N_CTX, config.BLOCK_M):
+        for start_m in range(0, config.N_CTX, config.BLOCK_M):
 # @end
+            offs_m = start_m + gl.arange(0, config.BLOCK_M)
 
-# @ref flash3-bwd-wait-qi flash3-bwd-wait-do
-        q_smem, q_empty, qdo_state = qdo_chnl.consumer_acquire(qdo_state)
-        do_smem, do_empty, qdo_state = qdo_chnl.consumer_acquire(qdo_state)
-# @end
-
-# @ref flash3-bwd-load-li-di flash3-bwd-partition-do-l
-        lse = gl.full([config.BLOCK_M], 1.0, gl.float32)
-        d_i = gl.full([config.BLOCK_M], 0.0, gl.float32)
+# @ref flash3-bwd-wait-qi flash3-bwd-wait-do flash3-bwd-load-li-di
+            q_smem, q_empty, q_state = q_chnl.consumer_acquire(q_state)
+            do_smem, do_empty, do_state = do_chnl.consumer_acquire(do_state)
+            l_smem, l_empty, l_state = l_chnl.consumer_acquire(l_state)
+            d_smem, d_empty, d_state = d_chnl.consumer_acquire(d_state)
+            q = q_smem.load()
+            do = do_smem.load()
+            lse = l_smem.load()[:, 0]
+            d_i = d_smem.load()[:, 0]
 # @end
 
 # @ref flash3-bwd-score flash3-bwd-prob
-        s = gl.dot(q_smem.load(), k_smem.load().trans()) * config.qk_scale
+            s = gl.dot(q, k.trans()) * config.qk_scale
 # @end
 
 # @ref flash3-bwd-causal-prob
-        q_rows = start_m + gl.arange(0, config.BLOCK_M)[:, None]
-        k_cols = gl.arange(0, config.BLOCK_N)[None, :]
-        s = gl.where(q_rows >= k_cols, s, -float("inf"))
+            q_rows = offs_m[:, None]
+            k_cols = offs_n[None, :]
+            s = gl.where(q_rows >= k_cols, s, -float("inf"))
 # @end
 
 # @ref flash3-bwd-score flash3-bwd-prob
-        p = gl.exp2(s - lse[:, None] * 1.44269504)
+            p = gl.exp2(s - lse[:, None] * 1.44269504)
 # @end
 
 # @ref flash3-bwd-dv
-        dv += gl.dot(p.trans(), do_smem.load())
+            dv += gl.dot(p.trans(), do)
 # @end
 
 # @ref flash3-bwd-dp
-        dp = gl.dot(do_smem.load(), v_smem.load().trans())
+            dp = gl.dot(do, v.trans())
 # @end
 
 # @ref flash3-bwd-ds
-        ds = p * (dp - d_i[:, None])
-# @end
-
-# @ref flash3-bwd-dk
-        dk += gl.dot(ds.trans(), q_smem.load()) * config.grad_scale
-# @end
-
-# @ref flash3-bwd-dq-local
-        dq_local = gl.dot(ds, k_smem.load()) * config.grad_scale
+            ds = p * (dp - d_i[:, None])
 # @end
 
 # @ref flash3-bwd-dq-causal-mask
-        dq_local = gl.where(q_rows >= k_cols, dq_local, 0.0)
+            ds = gl.where(q_rows >= k_cols, ds, 0.0)
+# @end
+
+# @ref flash3-bwd-dk
+            dk += gl.dot(ds.trans(), q) * config.grad_scale
+# @end
+
+# @ref flash3-bwd-dq-local
+            dq_local = gl.dot(ds, k) * config.grad_scale
+            dq_smem, dq_ready, dq_state = dq_chnl.producer_acquire(dq_state)
+            dq_smem.store(dq_local)
+            fence_async_shared()
+            mbarrier.arrive(dq_ready)
+# @end
+
+            mbarrier.arrive(q_empty)
+            mbarrier.arrive(do_empty)
+            mbarrier.arrive(l_empty)
+            mbarrier.arrive(d_empty)
+
+        gl.store(dK + prog.base_vec + offs_n[:, None] * config.HEAD_DIM + offs_d[None, :], dk)
+        gl.store(dV + prog.base_vec + offs_n[:, None] * config.HEAD_DIM + offs_d[None, :], dv)
+        mbarrier.arrive(k_empty)
+        mbarrier.arrive(v_empty)
+
+
+@gluon.jit
+def _flash3_bwd_dq_store(config, channels, dQ):
+    k_chnl, v_chnl, q_chnl, do_chnl, l_chnl, d_chnl, dq_chnl = channels
+    dq_state = dq_chnl.state()
+    num_tiles = gl.cdiv(config.N_CTX, config.BLOCK_N) * config.Z * config.H
+
+    for tile_id in range(gl.program_id(0), num_tiles, config.NUM_SMS):
+        prog = get_bwd_program(config, tile_id)
+
+# @ref flash3-bwd-dq-writer-loop
+        for start_m in range(0, config.N_CTX, config.BLOCK_M):
+# @end
+            offs_m = start_m + gl.arange(0, config.BLOCK_M)
+            offs_d = gl.arange(0, config.HEAD_DIM)
+
+# @ref flash3-bwd-dq-ready
+            dq_smem, dq_empty, dq_state = dq_chnl.consumer_acquire(dq_state)
+            dq_local = dq_smem.load()
+# @end
+
+# @ref flash3-bwd-dq-atomic flash3-bwd-dq-writer-end
+            # First K tile initializes dQ_i; later K tiles atomically add their
+            # partials, matching the production dQ-writer ownership pattern.
+            if prog.start_n == 0:
+                gl.store(dQ + prog.base_vec + offs_m[:, None] * config.HEAD_DIM + offs_d[None, :], dq_local)
+            else:
+                gl.atomic_add(dQ + prog.base_vec + offs_m[:, None] * config.HEAD_DIM + offs_d[None, :], dq_local, sem="relaxed")
+            mbarrier.arrive(dq_empty)
 # @end
 
 
 # @ref flash3-backward-label
 @gluon.jit
-def flash3_bwd_full(Q, K, V, dO, O, L, D, dQ, dK, dV, alpha: gl.constexpr, N_CTX: gl.constexpr):
-    # Backward follows FA3's producer / consumer / dQ-writer split.
-    pass
+def flash3_bwd_full(
+    Q,
+    K,
+    V,
+    dO,
+    O,
+    L,
+    D,
+    dQ,
+    dK,
+    dV,
+    alpha: gl.constexpr,
+    Z,
+    H,
+    N_CTX,
+    BLOCK_M: gl.constexpr,
+    BLOCK_N: gl.constexpr,
+    HEAD_DIM: gl.constexpr,
+    NUM_SMS: gl.constexpr,
+    dtype: gl.constexpr,
+    num_warps: gl.constexpr,
+):
+    config = Flash3Config(alpha * 1.44269504, alpha, Z, H, N_CTX, BLOCK_M, BLOCK_N, HEAD_DIM, NUM_SMS, dtype, num_warps)
+    k_chnl = SmemChannel.alloc([BLOCK_N, HEAD_DIM], dtype, config.k_layout, num_buffers=2)
+    v_chnl = SmemChannel.alloc([BLOCK_N, HEAD_DIM], dtype, config.v_layout, num_buffers=2)
+    q_chnl = SmemChannel.alloc([BLOCK_M, HEAD_DIM], dtype, config.q_layout, num_buffers=2)
+    do_chnl = SmemChannel.alloc([BLOCK_M, HEAD_DIM], dtype, config.q_layout, num_buffers=2)
+    l_chnl = SmemChannel.alloc([BLOCK_M, 1], gl.float32, config.row_layout, num_buffers=2)
+    d_chnl = SmemChannel.alloc([BLOCK_M, 1], gl.float32, config.row_layout, num_buffers=2)
+    dq_chnl = SmemChannel.alloc([BLOCK_M, HEAD_DIM], gl.float32, config.o_layout, num_buffers=2)
+    channels = (k_chnl, v_chnl, q_chnl, do_chnl, l_chnl, d_chnl, dq_chnl)
+
+    k_chnl.init()
+    v_chnl.init()
+    q_chnl.init()
+    do_chnl.init()
+    l_chnl.init()
+    d_chnl.init()
+    dq_chnl.init()
 # @end
 
-# @ref flash3-bwd-partition-qkv flash3-bwd-partition-do-l
-    # Q, dO, L, and D are streamed by query block; K and V are fixed by key block.
-# @end
-
-# @ref flash3-bwd-dq-writer-loop
-    for start_m in range(0, N_CTX, BLOCK_M):
-        pass
-# @end
-
-# @ref flash3-bwd-dq-ready
-        # Wait until the consumer publishes dQ_i^(local) into shared memory.
-# @end
-
-# @ref flash3-bwd-dq-atomic flash3-bwd-dq-writer-end
-        # Serialize the global accumulation of dQ_i from all key blocks.
-        gl.atomic_add(dQ + start_m, 0.0, sem="relaxed")
+# @ref flash3-bwd-partition-qkv flash3-bwd-partition-do-l flash3-bwd-dq-writer-else-if
+    # Producer streams K/V and Q/dO/L/D; consumers accumulate dK/dV and publish
+    # dQ partials; a dQ-writer serializes global dQ updates.
+    gl.warp_specialize(
+        [
+            (_flash3_bwd_load, (config, channels, Q, K, V, dO, L, D)),
+            (_flash3_bwd_compute, (config, channels, dK, dV)),
+            (_flash3_bwd_dq_store, (config, channels, dQ)),
+        ],
+        [1, 1, 1],
+        [24, 160, 24],
+    )
 # @end
 
 
@@ -523,7 +682,7 @@ def flash3_fwd_full(
 # @ref flash3-cta-pipeline flash3-cta-consumer-loop flash3-cta-producer-registers flash3-cta-consumer-registers flash3-consumer-registers
     gl.warp_specialize(
         [
-            (_flash3_fwd_compute, (config, channels, descs)),
+            (_flash3_fwd_compute, (config, channels, descs, M)),
             (_flash3_fwd_load, (config, channels, descs)),
             (_flash3_fwd_store, (config, channels, descs)),
         ],

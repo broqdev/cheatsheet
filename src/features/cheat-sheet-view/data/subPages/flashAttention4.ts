@@ -36,25 +36,39 @@ const causalFlash4MmaRequire = [
   text(' MMA atoms, two-CTA cluster layout, tensor-memory score/probability/output tiles, and specialized load/MMA/softmax/correction warp groups.'),
 ]
 
+const flash4HardwarePrelude: LatexBlockSpec[] = [
+  {
+    id: 'flash4-hardware',
+    title: 'Hardware',
+    require: [
+      text('Blackwell hardware features'),
+    ],
+    rows: [
+      row('flash4-hardware-mma-meaning', [
+        strong('Fully asynchronous MMA. '),
+        text('Matrix multiply-accumulate is the tensor-core operation that computes '),
+        math(String.raw`D=A B + C`),
+        text(' for matrix fragments. FlashAttention-4 maps the QK and PV products onto fully asynchronous Blackwell '),
+        math(String.raw`tcgen05`),
+        text('/UMMA-style MMA atoms: QK writes score tiles into tensor memory, and PV consumes tensor-memory probabilities plus transposed V to accumulate '),
+        math(String.raw`O`),
+        text('.'),
+      ], ['flash4-mma-meaning', 'flash4-fwd-qk-mma', 'flash4-fwd-pv-mma']),
+      row('flash4-hardware-cta-define', [
+        strong('Thread-block cluster units (CTA). '),
+        text('A cooperative thread array is one CUDA thread block with its own warps, shared memory, named barriers, and pipeline state. FlashAttention-4 binds two CTAs into one cluster tile and assigns load, MMA, softmax, correction, and empty warp groups so the pair cooperates along the '),
+        math(String.raw`M`),
+        text(' dimension.'),
+      ], ['flash4-cta-thread-block']),
+    ],
+  },
+]
+
 const flash4MmaRows: AlgorithmLineSpec[] = [
   row('flash4-mma-forward-label', [strong('MMA ops in forward')], [
     'flash4-mma-atoms',
     'flash4-mma-operands',
   ]),
-  row('flash4-mma-meaning-row', [
-    strong('MMA means matrix multiply-accumulate. '),
-    text('At the hardware level, it is a tensor-core tile operation that computes '),
-    math(String.raw`D=A B + C`),
-    text(' for small matrix fragments. In this code, '),
-    math(String.raw`cute.gemm`),
-    text(' is the CuTe DSL call that drives those tiled MMA atoms.'),
-  ], ['flash4-mma-meaning', 'flash4-fwd-qk-mma', 'flash4-fwd-pv-mma'], 1),
-  row('flash4-wgmma-meaning-row', [
-    strong('WGMMA means warp-group MMA. '),
-    text('It is Hopper\'s form of MMA where a group of warps cooperates on one tensor-core matrix instruction. FlashAttention-3 targets Hopper WGMMA; this FlashAttention-4 sketch targets Blackwell '),
-    math(String.raw`tcgen05`),
-    text(' / UMMA-style atoms instead, with tensor-memory accumulators and two-CTA support.'),
-  ], ['flash4-wgmma-vs-umma', 'flash4-mma-atoms', 'flash4-2cta-cgroup'], 1),
   row('flash4-mma-contract', [
     strong('SM100 MMA replaces the older GEMM center. '),
     text('Compared with FA2 block matmuls and FA3 Hopper WGMMA, this sketch names Blackwell '),
@@ -128,10 +142,6 @@ const flash4MmaRows: AlgorithmLineSpec[] = [
     'flash4-2cta-shape',
     'flash4-2cta-cgroup',
   ]),
-  row('flash4-2cta-define-row', [
-    strong('CTA means cooperative thread array. '),
-    text('In CUDA terms, it is one thread block: a fixed group of warps with CTA-local shared memory, named barriers, and pipeline state. This sketch assigns softmax, correction, MMA, load, and empty warps inside each CTA.'),
-  ], ['flash4-cta-thread-block'], 1),
   row('flash4-2cta-shape-row', [
     strong('Forward binds two CTAs as one M tile. '),
     text('The cluster shape is '),
@@ -349,6 +359,7 @@ const flash4IdeaNotes: LatexBlockSpec[] = [
         text(' loop around its own tile body. The real scheduler classes carry more persistent/CLC bookkeeping than this compact map.'),
       ], [
         'flash4-schedule-create',
+        'flash4-schedule-work-loop',
         'flash4-schedule-work-load',
         'flash4-schedule-work-mma',
         'flash4-schedule-work-softmax',
@@ -383,6 +394,7 @@ const causalFlash4MmaRows = flash4MmaRows.map(withCausalRows)
 const flash4Forward = defineAttentionContent({
   rawCode: flashAttention4CuteDslCode,
   require: flash4MmaRequire,
+  prelude: flash4HardwarePrelude,
   rows: flash4MmaRows,
   notes: flash4IdeaNotes,
   ignoredUnusedRefs: causalCodeRefIds,
@@ -391,6 +403,7 @@ const flash4Forward = defineAttentionContent({
 const causalFlash4Forward = defineAttentionContent({
   rawCode: flashAttention4CuteDslCode,
   require: causalFlash4MmaRequire,
+  prelude: flash4HardwarePrelude,
   rows: causalFlash4MmaRows,
   notes: flash4IdeaNotes,
 })
@@ -400,7 +413,7 @@ export const flashAttention4Example: AttentionExample = {
   urlTag: 'flashattention-4',
   label: 'FlashAttention-4',
   description:
-    'FlashAttention-4 moves the FA2/FA3 tiled-attention schedule onto Blackwell SM100 with FP8 tensors, TMA-fed 2-CTA clusters, tcgen05 MMA, and tensor-memory staging.',
+    'FlashAttention-4 refines exact tiled attention for Blackwell with FP8-oriented scheduling and cooperative tile execution.',
   algorithmTitle: 'FlashAttention-4',
   content: {
     unmasked: flash4Forward,

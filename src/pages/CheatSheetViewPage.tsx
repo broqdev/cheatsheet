@@ -288,6 +288,7 @@ function CheatSheetViewPage() {
       : activeExample.content[attentionMode]
   const activeLineId = selectedLineId ?? hoveredLineId
   const selectableRows = [
+    ...(activeContent.prelude?.flatMap((note) => note.rows) ?? []),
     ...activeContent.rows,
     ...(activeContent.notes?.flatMap((note) => note.rows) ?? []),
   ]
@@ -299,8 +300,8 @@ function CheatSheetViewPage() {
     [activeExample, attentionMode, activeContent]
   )
   const activeLatex = useMemo(
-    () => latexDocument(activeExample, blocks, activeContent.notes),
-    [activeExample, activeContent.notes, blocks]
+    () => latexDocument(activeExample, activeContent.prelude, blocks, activeContent.notes),
+    [activeExample, activeContent.notes, activeContent.prelude, blocks]
   )
 
   useEffect(() => {
@@ -602,6 +603,7 @@ function CheatSheetViewPage() {
           blocks={blocks}
           latexCopied={copiedTarget === 'latex'}
           notes={activeContent.notes}
+          prelude={activeContent.prelude}
           onCopyLatex={() => copyRegion('latex', activeLatex)}
           onLineActivate={handleAlgorithmRowClick}
           onLineFocus={setHoveredLineId}
