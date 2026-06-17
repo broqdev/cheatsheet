@@ -21,13 +21,13 @@ import type {
 } from '../features/cheat-sheet-view/model'
 
 function normalizeUrlTag(value: string) {
-  const hashValue = value.startsWith('#') ? value.slice(1) : value
-  let decodedValue = hashValue
+  const routeValue = value.replace(/^#/, '').replace(/^\/+|\/+$/g, '')
+  let decodedValue = routeValue
 
   try {
-    decodedValue = decodeURIComponent(hashValue)
+    decodedValue = decodeURIComponent(routeValue)
   } catch {
-    decodedValue = hashValue
+    decodedValue = routeValue
   }
 
   return decodedValue
@@ -51,19 +51,126 @@ function exampleFromUrlTag(value: string) {
   return examples.find((example) => urlTagsForExample(example).includes(tag))
 }
 
-function canonicalHashForExample(example: AttentionExample) {
-  return `#${encodeURIComponent(normalizeUrlTag(example.urlTag))}`
+function siteBasePath() {
+  const pathname = new URL(import.meta.env.BASE_URL, window.location.origin).pathname
+
+  return pathname.endsWith('/') ? pathname : `${pathname}/`
+}
+
+function routeTagFromLocation() {
+  const pathname = window.location.pathname
+  const basePath = siteBasePath()
+  const pathInsideBase =
+    basePath === '/'
+      ? pathname.replace(/^\/+/, '')
+      : pathname.startsWith(basePath)
+        ? pathname.slice(basePath.length)
+        : pathname.replace(/^\/+/, '')
+
+  return pathInsideBase.split('/').filter(Boolean).join('-')
+}
+
+function exampleFromLocation() {
+  return (
+    exampleFromUrlTag(routeTagFromLocation()) ??
+    exampleFromUrlTag(window.location.hash) ??
+    examples[0]
+  )
+}
+
+function canonicalPathForExample(example: AttentionExample) {
+  return `${siteBasePath()}${encodeURIComponent(normalizeUrlTag(example.urlTag))}`
+}
+
+type ToggleQueryState = {
+  attentionMaskEnabled: boolean
+  dropoutEnabled: boolean
+  fp8Enabled: boolean
+}
+
+function queryToggleEnabled(params: URLSearchParams, key: string) {
+  const value = params.get(key)?.toLowerCase()
+
+  return ['1', 'true', 'yes', 'on'].includes(value ?? '')
+}
+
+function toggleStateFromSearch(search: string): ToggleQueryState {
+  const params = new URLSearchParams(search)
+
+  return {
+    attentionMaskEnabled: queryToggleEnabled(params, 'mask'),
+    dropoutEnabled: queryToggleEnabled(params, 'dropout'),
+    fp8Enabled: queryToggleEnabled(params, 'fp8'),
+  }
+}
+
+function attentionModeForState(toggleState: ToggleQueryState): AttentionMode {
+  return toggleState.attentionMaskEnabled ? 'masked' : 'unmasked'
+}
+
+function availableToggleState(example: AttentionExample, toggleState: ToggleQueryState) {
+  const attentionMode = attentionModeForState(toggleState)
+
+  return {
+    attentionMaskEnabled: toggleState.attentionMaskEnabled,
+    dropoutEnabled:
+      toggleState.dropoutEnabled &&
+      example.id === 'flash1' &&
+      Boolean(example.dropoutContent?.[attentionMode]),
+    fp8Enabled:
+      toggleState.fp8Enabled &&
+      example.id === 'flash3' &&
+      Boolean(example.fp8Content?.[attentionMode]),
+  }
+}
+
+function viewStateFromLocation() {
+  const example = exampleFromLocation()
+  const toggleState = availableToggleState(example, toggleStateFromSearch(window.location.search))
+
+  return { example, toggleState }
+}
+
+function searchForToggleState(example: AttentionExample, toggleState: ToggleQueryState) {
+  const params = new URLSearchParams(window.location.search)
+  const availableState = availableToggleState(example, toggleState)
+
+  for (const key of ['sync', 'mask', 'dropout', 'fp8']) {
+    params.delete(key)
+  }
+
+  if (availableState.attentionMaskEnabled) {
+    params.set('mask', 'on')
+  }
+
+  if (availableState.dropoutEnabled) {
+    params.set('dropout', 'on')
+  }
+
+  if (availableState.fp8Enabled) {
+    params.set('fp8', 'on')
+  }
+
+  const nextSearch = params.toString()
+
+  return nextSearch ? `?${nextSearch}` : ''
 }
 
 function CheatSheetViewPage() {
   const [activeExampleId, setActiveExampleId] = useState(
-    () => exampleFromUrlTag(window.location.hash)?.id ?? examples[0].id
+    () => viewStateFromLocation().example.id
   )
   const [hoveredLineId, setHoveredLineId] = useState<string | null>(null)
   const [selectedLineId, setSelectedLineId] = useState<string | null>(null)
-  const [attentionMaskEnabled, setAttentionMaskEnabled] = useState(false)
-  const [dropoutEnabled, setDropoutEnabled] = useState(false)
-  const [fp8Enabled, setFp8Enabled] = useState(false)
+  const [attentionMaskEnabled, setAttentionMaskEnabled] = useState(
+    () => viewStateFromLocation().toggleState.attentionMaskEnabled
+  )
+  const [dropoutEnabled, setDropoutEnabled] = useState(
+    () => viewStateFromLocation().toggleState.dropoutEnabled
+  )
+  const [fp8Enabled, setFp8Enabled] = useState(
+    () => viewStateFromLocation().toggleState.fp8Enabled
+  )
   const [copiedTarget, setCopiedTarget] = useState<CopyTarget | null>(null)
   const codeRegionRef = useRef<HTMLDivElement>(null)
 
@@ -97,26 +204,61 @@ function CheatSheetViewPage() {
   )
 
   useEffect(() => {
-    function syncExampleFromUrlTag() {
-      setActiveExampleId(exampleFromUrlTag(window.location.hash)?.id ?? examples[0].id)
-      setDropoutEnabled(false)
-      setFp8Enabled(false)
+    function syncFromLocation() {
+      const { example, toggleState } = viewStateFromLocation()
+
+      setActiveExampleId(example.id)
+      applyToggleState(toggleState)
       setHoveredLineId(null)
       setSelectedLineId(null)
+
+      const nextPath = routeTagFromLocation() || window.location.hash
+        ? canonicalPathForExample(example)
+        : window.location.pathname
+      const nextSearch = searchForToggleState(example, toggleState)
+
+      if (
+        window.location.pathname !== nextPath ||
+        window.location.search !== nextSearch ||
+        window.location.hash
+      ) {
+        window.history.replaceState(null, '', `${nextPath}${nextSearch}`)
+      }
     }
 
-    window.addEventListener('hashchange', syncExampleFromUrlTag)
-    window.addEventListener('popstate', syncExampleFromUrlTag)
+    syncFromLocation()
+    window.addEventListener('hashchange', syncFromLocation)
+    window.addEventListener('popstate', syncFromLocation)
 
     return () => {
-      window.removeEventListener('hashchange', syncExampleFromUrlTag)
-      window.removeEventListener('popstate', syncExampleFromUrlTag)
+      window.removeEventListener('hashchange', syncFromLocation)
+      window.removeEventListener('popstate', syncFromLocation)
     }
   }, [])
 
+  function currentToggleState(): ToggleQueryState {
+    return {
+      attentionMaskEnabled,
+      dropoutEnabled,
+      fp8Enabled,
+    }
+  }
+
+  function applyToggleState(toggleState: ToggleQueryState) {
+    setAttentionMaskEnabled(toggleState.attentionMaskEnabled)
+    setDropoutEnabled(toggleState.dropoutEnabled)
+    setFp8Enabled(toggleState.fp8Enabled)
+  }
+
+  function replaceUrlForToggleState(example: AttentionExample, toggleState: ToggleQueryState) {
+    window.history.replaceState(
+      null,
+      '',
+      `${canonicalPathForExample(example)}${searchForToggleState(example, toggleState)}`
+    )
+  }
+
   function resetExampleState() {
-    setDropoutEnabled(false)
-    setFp8Enabled(false)
     setHoveredLineId(null)
     setSelectedLineId(null)
   }
@@ -128,24 +270,34 @@ function CheatSheetViewPage() {
       return
     }
 
+    const nextToggleState = availableToggleState(nextExample, currentToggleState())
+
     setActiveExampleId(nextExample.id)
+    applyToggleState(nextToggleState)
     resetExampleState()
 
-    const nextHash = canonicalHashForExample(nextExample)
+    const nextPath = canonicalPathForExample(nextExample)
+    const nextSearch = searchForToggleState(nextExample, nextToggleState)
+    const nextUrl = `${nextPath}${nextSearch}`
 
-    if (window.location.hash !== nextHash) {
-      window.history.pushState(
-        null,
-        '',
-        `${window.location.pathname}${window.location.search}${nextHash}`
-      )
+    if (
+      window.location.pathname !== nextPath ||
+      window.location.search !== nextSearch ||
+      window.location.hash
+    ) {
+      window.history.pushState(null, '', nextUrl)
     }
   }
 
   function toggleAttentionMask(enabled: boolean) {
-    setAttentionMaskEnabled(enabled)
-    setHoveredLineId(null)
-    setSelectedLineId(null)
+    const nextToggleState = availableToggleState(activeExample, {
+      ...currentToggleState(),
+      attentionMaskEnabled: enabled,
+    })
+
+    applyToggleState(nextToggleState)
+    resetExampleState()
+    replaceUrlForToggleState(activeExample, nextToggleState)
   }
 
   function toggleDropout(enabled: boolean) {
@@ -153,9 +305,14 @@ function CheatSheetViewPage() {
       return
     }
 
-    setDropoutEnabled(enabled)
-    setHoveredLineId(null)
-    setSelectedLineId(null)
+    const nextToggleState = availableToggleState(activeExample, {
+      ...currentToggleState(),
+      dropoutEnabled: enabled,
+    })
+
+    applyToggleState(nextToggleState)
+    resetExampleState()
+    replaceUrlForToggleState(activeExample, nextToggleState)
   }
 
   function toggleFp8(enabled: boolean) {
@@ -163,9 +320,14 @@ function CheatSheetViewPage() {
       return
     }
 
-    setFp8Enabled(enabled)
-    setHoveredLineId(null)
-    setSelectedLineId(null)
+    const nextToggleState = availableToggleState(activeExample, {
+      ...currentToggleState(),
+      fp8Enabled: enabled,
+    })
+
+    applyToggleState(nextToggleState)
+    resetExampleState()
+    replaceUrlForToggleState(activeExample, nextToggleState)
   }
 
   function scrollCodeLineIntoView(codeLineNumbers: number[]) {

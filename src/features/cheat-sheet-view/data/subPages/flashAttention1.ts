@@ -843,7 +843,7 @@ const flashDropoutUnmaskedRows: AlgorithmLineSpec[] = renumberAlgorithmRows(
 
 export const flashAttention1Example: AttentionExample = {
   id: 'flash1',
-  urlTag: 'flashattention-1',
+  urlTag: 'flash-attention-1',
   label: 'FlashAttention-1',
   description: 'FlashAttention-1 tiles Q, K, and V, applies online softmax, and avoids materializing the full attention matrix in HBM.',
   algorithmTitle: 'FlashAttention-1',

@@ -935,7 +935,7 @@ const causalHopperFp8Flash3Rows = causalFlash3Rows.map(withHopperFp8Rows)
 
 export const flashAttention3Example: AttentionExample = {
   id: 'flash3',
-  urlTag: 'flashattention-3',
+  urlTag: 'flash-attention-3',
   label: 'FlashAttention-3',
   description:
     'FlashAttention-3 targets NVIDIA Hopper with asynchronous, warp-specialized producer, consumer, and dQ-writer pipelines for exact tiled attention.',

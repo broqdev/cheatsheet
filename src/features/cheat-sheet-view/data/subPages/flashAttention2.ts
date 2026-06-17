@@ -1186,7 +1186,7 @@ const causalFlash2Rows: AlgorithmLineSpec[] = [
 
 export const flashAttention2Example: AttentionExample = {
   id: 'flash2',
-  urlTag: 'flashattention-2',
+  urlTag: 'flash-attention-2',
   label: 'FlashAttention-2',
   description: 'FlashAttention-2 keeps exact tiled attention while improving parallelism, work partitioning, and non-matmul overhead.',
   algorithmTitle: 'FlashAttention-2',

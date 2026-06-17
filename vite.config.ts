@@ -1,3 +1,5 @@
+import { copyFileSync } from 'node:fs'
+import { join } from 'node:path'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig, type Plugin } from 'vite'
@@ -90,6 +92,13 @@ function seoPlugin(): Plugin {
         fileName: 'sitemap.xml',
         source: `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n  <url>\n    <loc>${canonicalUrl}</loc>\n    <changefreq>weekly</changefreq>\n    <priority>1.0</priority>\n  </url>\n</urlset>\n`,
       })
+    },
+    writeBundle(options) {
+      if (!options.dir) {
+        return
+      }
+
+      copyFileSync(join(options.dir, 'index.html'), join(options.dir, '404.html'))
     },
   }
 }
