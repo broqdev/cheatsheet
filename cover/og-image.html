@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1200, initial-scale=1" />
+    <title>Broq Cheatsheet cover</title>
+    <style>
+      :root {
+        --paper: #f6f8f7;
+        --ink: #18201e;
+        --muted: #66736e;
+        --line: #d8dfdb;
+        --panel: rgba(255, 255, 255, 0.9);
+        --accent: #007f70;
+        --accent-soft: rgba(0, 127, 112, 0.12);
+        --focus: #ffb000;
+        --code-bg: #111816;
+        --code-line: rgba(255, 255, 255, 0.08);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        width: 1200px;
+        height: 630px;
+        margin: 0;
+        overflow: hidden;
+      }
+
+      body {
+        color: var(--ink);
+        background: var(--paper);
+        font-family:
+          Aptos,
+          "Segoe UI",
+          Helvetica,
+          Arial,
+          sans-serif;
+        font-synthesis: none;
+        text-rendering: optimizeLegibility;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      .stage {
+        position: relative;
+        width: 1200px;
+        height: 630px;
+        overflow: hidden;
+        background:
+          linear-gradient(90deg, rgba(24, 32, 30, 0.055) 1px, transparent 1px),
+          linear-gradient(rgba(24, 32, 30, 0.055) 1px, transparent 1px),
+          radial-gradient(circle at 86% 82%, rgba(0, 127, 112, 0.18), transparent 34%),
+          var(--paper);
+        background-size: 32px 32px, 32px 32px, auto, auto;
+      }
+
+      .app-shot {
+        position: absolute;
+        left: 70px;
+        top: 48px;
+        width: 1210px;
+        height: 552px;
+        transform: rotate(-2.2deg);
+        transform-origin: 54% 46%;
+        border: 1px solid rgba(24, 32, 30, 0.42);
+        border-radius: 8px;
+        background: rgba(246, 248, 247, 0.95);
+        box-shadow:
+          22px 22px 0 rgba(0, 127, 112, 0.14),
+          0 26px 70px rgba(24, 32, 30, 0.16);
+      }
+
+      .workspace {
+        display: flex;
+        width: 100%;
+        height: 100%;
+        flex-direction: column;
+        gap: 17px;
+        padding: 28px 28px 28px;
+      }
+
+      .cheatsheet-header {
+        display: flex;
+        min-height: 58px;
+        align-items: center;
+        gap: 18px;
+      }
+
+      .cheatsheet-title {
+        display: grid;
+        min-width: 350px;
+        gap: 5px;
+      }
+
+      .cheatsheet-title h1 {
+        margin: 0;
+        color: var(--ink);
+        font-size: 34px;
+        font-weight: 900;
+        line-height: 1;
+        letter-spacing: 0;
+      }
+
+      .cheatsheet-kicker {
+        margin: 0;
+        color: var(--accent);
+        font-size: 15px;
+        font-weight: 850;
+        line-height: 1;
+        letter-spacing: 0;
+      }
+
+      .catalog-trigger {
+        display: flex;
+        width: 330px;
+        height: 40px;
+        margin-left: auto;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        border: 1px solid rgba(24, 32, 30, 0.52);
+        border-radius: 8px;
+        padding: 0 12px;
+        background: rgba(255, 255, 255, 0.82);
+        color: var(--ink);
+        font-size: 17px;
+        font-weight: 800;
+        box-shadow: 4px 4px 0 rgba(0, 127, 112, 0.1);
+      }
+
+      .catalog-caret {
+        width: 8px;
+        height: 8px;
+        border-right: 2px solid currentColor;
+        border-bottom: 2px solid currentColor;
+        transform: rotate(45deg) translateY(-2px);
+      }
+
+      .main-panel {
+        display: grid;
+        min-height: 0;
+        flex: 1;
+        overflow: hidden;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        border: 1px solid rgba(24, 32, 30, 0.82);
+        border-radius: 8px;
+        background: var(--panel);
+        box-shadow: 12px 12px 0 rgba(0, 127, 112, 0.14);
+      }
+
+      .math-region {
+        min-width: 0;
+        min-height: 0;
+        overflow: hidden;
+        padding: 18px 21px;
+        border-right: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.78);
+        backdrop-filter: blur(10px);
+      }
+
+      .algorithm-paper {
+        color: #101614;
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: 15.2px;
+        line-height: 1.12;
+      }
+
+      .algorithm-header {
+        display: flex;
+        gap: 8px;
+        align-items: baseline;
+        border-top: 2px solid var(--ink);
+        border-bottom: 1px solid var(--ink);
+        padding: 3px 0 2px;
+        font-size: 17px;
+      }
+
+      .algorithm-header h2 {
+        margin: 0;
+        font-size: inherit;
+        font-weight: inherit;
+        font-variant: small-caps;
+      }
+
+      .algorithm-require {
+        margin: 5px 0 4px;
+        font-size: 14.6px;
+      }
+
+      .algorithm-lines {
+        display: grid;
+        border-bottom: 1px solid var(--ink);
+        padding-bottom: 4px;
+      }
+
+      .algorithm-row {
+        display: grid;
+        grid-template-columns: 25px minmax(0, 1fr);
+        border: 1px solid transparent;
+        border-radius: 4px;
+        padding: 0 1px;
+        background: transparent;
+      }
+
+      .algorithm-row.active {
+        border-color: transparent;
+        background: transparent;
+      }
+
+      .algorithm-row-number {
+        padding-right: 6px;
+        color: #1f2926;
+        font-size: 0.88em;
+        text-align: right;
+      }
+
+      .algorithm-row-body {
+        min-width: 0;
+      }
+
+      .algorithm-row.active .algorithm-row-body {
+        display: inline-block;
+        justify-self: start;
+        width: max-content;
+        max-width: 100%;
+        margin: 1px 0 1px 1px;
+        border: 1px solid var(--accent);
+        border-radius: 4px;
+        padding: 1px 5px 2px;
+        background: rgba(0, 127, 112, 0.09);
+      }
+
+      .katexish {
+        white-space: normal;
+      }
+
+      .code-region {
+        min-width: 0;
+        min-height: 0;
+        overflow: hidden;
+        padding: 18px 0;
+        background:
+          linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+          var(--code-bg);
+        background-size: 100% 30px;
+        color: #e8f0ed;
+        font-family:
+          "SFMono-Regular",
+          Consolas,
+          "Liberation Mono",
+          monospace;
+        font-size: 14px;
+        line-height: 1.52;
+      }
+
+      .code-line {
+        display: grid;
+        min-height: 1.52em;
+        grid-template-columns: 46px minmax(0, 1fr);
+        padding-right: 16px;
+      }
+
+      .code-line.active {
+        background: rgba(255, 176, 0, 0.18);
+        box-shadow: inset 3px 0 0 var(--focus);
+      }
+
+      .line-number {
+        padding-right: 14px;
+        color: rgba(232, 240, 237, 0.42);
+        text-align: right;
+        user-select: none;
+      }
+
+      .line-code {
+        display: block;
+        min-width: 0;
+        overflow: hidden;
+        overflow-wrap: normal;
+        white-space: pre;
+      }
+
+      .comment {
+        color: #7f938d;
+      }
+
+      .keyword,
+      .operator {
+        color: #7edfd2;
+      }
+
+      .function {
+        color: #ffd166;
+      }
+
+      .string {
+        color: #b8e986;
+      }
+
+      .number {
+        color: #ff9f7f;
+      }
+
+    </style>
+  </head>
+  <body>
+    <main class="stage" aria-label="Broq Cheatsheet social cover">
+      <section class="app-shot" aria-label="Broq Cheatsheet app preview">
+        <div class="workspace">
+          <header class="cheatsheet-header">
+            <div class="cheatsheet-title">
+              <h1>Broq Cheatsheet</h1>
+              <p class="cheatsheet-kicker">Unified Math Code Cheatsheet</p>
+            </div>
+            <div class="catalog-trigger">
+              <span>FlashAttention-1</span>
+              <span class="catalog-caret"></span>
+            </div>
+          </header>
+
+          <section class="main-panel" aria-label="Equation to code workspace">
+            <div class="math-region">
+              <article class="algorithm-paper">
+                <div class="algorithm-header">
+                  <strong>Algorithm 1</strong>
+                  <h2>FlashAttention-1 forward pass</h2>
+                </div>
+                <div class="algorithm-require">
+                  <strong>Require:</strong> Q,K,V &isin; R<sup>N&times;d</sup> in HBM, SRAM tile budget M, no attention mask.
+                </div>
+                <div class="algorithm-lines">
+                  <div class="algorithm-row">
+                    <span class="algorithm-row-number">1</span>
+                    <span class="algorithm-row-body katexish">Set B<sub>c</sub>=ceil(M/(4d)), B<sub>r</sub>=min(ceil(M/(4d)), d).</span>
+                  </div>
+                  <div class="algorithm-row">
+                    <span class="algorithm-row-number">2</span>
+                    <span class="algorithm-row-body katexish">Initialize O=(0)<sub>N&times;d</sub>, ell=(0)<sub>N</sub>, m=(-&infin;)<sub>N</sub>.</span>
+                  </div>
+                  <div class="algorithm-row">
+                    <span class="algorithm-row-number">3</span>
+                    <span class="algorithm-row-body katexish"><strong>for</strong> 1 &le; j &le; T<sub>c</sub> <strong>do</strong></span>
+                  </div>
+                  <div class="algorithm-row">
+                    <span class="algorithm-row-number">4</span>
+                    <span class="algorithm-row-body katexish">Load K<sub>j</sub>,V<sub>j</sub> from HBM to on-chip SRAM.</span>
+                  </div>
+                  <div class="algorithm-row">
+                    <span class="algorithm-row-number">5</span>
+                    <span class="algorithm-row-body katexish"><strong>for</strong> 1 &le; i &le; T<sub>r</sub> <strong>do</strong></span>
+                  </div>
+                  <div class="algorithm-row">
+                    <span class="algorithm-row-number">6</span>
+                    <span class="algorithm-row-body katexish">Load Q<sub>i</sub>,O<sub>i</sub>,ell<sub>i</sub>,m<sub>i</sub> from HBM to SRAM.</span>
+                  </div>
+                  <div class="algorithm-row active">
+                    <span class="algorithm-row-number">7</span>
+                    <span class="algorithm-row-body katexish">On chip, compute S<sub>ij</sub>=Q<sub>i</sub>K<sub>j</sub><sup>T</sup>/sqrt(d).</span>
+                  </div>
+                  <div class="algorithm-row active">
+                    <span class="algorithm-row-number">8</span>
+                    <span class="algorithm-row-body katexish">m&#771;<sub>ij</sub>=rowmax(S<sub>ij</sub>), P&#771;<sub>ij</sub>=exp(S<sub>ij</sub>-m&#771;<sub>ij</sub>), l&#771;<sub>ij</sub>=rowsum(P&#771;<sub>ij</sub>).</span>
+                  </div>
+                  <div class="algorithm-row active">
+                    <span class="algorithm-row-number">9</span>
+                    <span class="algorithm-row-body katexish">Update m<sub>i</sub><sup>new</sup>=max(m<sub>i</sub>,m&#771;<sub>ij</sub>), ell<sub>i</sub><sup>new</sup>, and acc.</span>
+                  </div>
+                  <div class="algorithm-row">
+                    <span class="algorithm-row-number">10</span>
+                    <span class="algorithm-row-body katexish">Write O<sub>i</sub> &larr; diag(ell<sub>i</sub><sup>new</sup>)<sup>-1</sup>acc and L<sub>i</sub>=m<sub>i</sub>+log ell<sub>i</sub> to HBM.</span>
+                  </div>
+                </div>
+              </article>
+            </div>
+
+            <pre class="code-region" aria-label="Highlighted code lines"><code><span class="code-line"><span class="line-number">11</span><span class="line-code"><span class="keyword">for</span> start_n <span class="keyword">in</span> range(<span class="number">0</span>, N_CTX, BLOCK_N):</span></span><span class="code-line"><span class="line-number">12</span><span class="line-code"><span class="comment">    # K_j,V_j tile loaded to SRAM before this slice.</span></span></span><span class="code-line active"><span class="line-number">13</span><span class="line-code">    s = tl.dot(q, k) * SCALE</span></span><span class="code-line active"><span class="line-number">14</span><span class="line-code"><span class="comment">    # rowmax / exp / rowsum are fused into online state.</span></span></span><span class="code-line active"><span class="line-number">15</span><span class="line-code">    m_new = tl.maximum(m, tl.max(s, axis=<span class="number">1</span>))</span></span><span class="code-line active"><span class="line-number">16</span><span class="line-code">    p = tl.exp(s - m_new[:, <span class="keyword">None</span>])</span></span><span class="code-line active"><span class="line-number">17</span><span class="line-code">    alpha = tl.exp(m - m_new)</span></span><span class="code-line active"><span class="line-number">18</span><span class="line-code">    l = l * alpha + tl.sum(p, axis=<span class="number">1</span>)</span></span><span class="code-line active"><span class="line-number">19</span><span class="line-code">    acc = acc * alpha[:, <span class="keyword">None</span>] + tl.dot(p, v)</span></span><span class="code-line"><span class="line-number">20</span><span class="line-code">    m = m_new</span></span><span class="code-line"><span class="line-number">21</span><span class="line-code"><span class="comment">    # O_i = acc / l_i^new; L_i = m_i + log(l_i).</span></span></span></code></pre>
+          </section>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
