@@ -25,10 +25,10 @@ from flash_attn.cute.mask import AttentionMask
 # - S = QK, P, and partial O live in Blackwell tensor memory.
 # - Load, MMA, softmax, correction, and epilogue run as specialized warp groups.
 #
-# @ref flash4-mma-meaning flash4-wgmma-vs-umma
+# @ref flash4-mma-meaning
 # MMA means matrix multiply-accumulate: a tensor-core tile computes D = A @ B + C.
-# WGMMA is Hopper's warp-group MMA form. On Blackwell, this sketch uses tcgen05 /
-# UMMA-style atoms, which can target tensor memory and participate in 2-CTA MMA.
+# On Blackwell, this sketch uses tcgen05 / UMMA-style atoms, which can target
+# tensor memory and participate in 2-CTA MMA.
 # @end
 
 LOG2_E = 1.4426950408889634
@@ -429,6 +429,8 @@ class FlashAttention4Sm100CuteDsl:
         self.iterations_qk = head_dim // self.qk_mma_tiler[2]
         self.iterations_pv = head_dim_v // self.pv_mma_tiler[1]
 # @ref flash4-q-stage-policy
+        # For the dedicated HD256 kernel, "Q stage" is the number of 128-wide
+        # head-dimension slices. It is not the generic SM100 q_stage M-buffer.
         if q_stage is None:
             q_stage = self.iterations_qk if head_dim == 256 else 1
         if head_dim == 256:
@@ -545,6 +547,8 @@ class FlashAttention4Sm100CuteDsl:
 # @end
 
 # @ref flash4-mma-operands flash4-2cta-tma
+        # The SMEM layouts are the contract between the TMA producer and the
+        # UMMA consumer; their staged mode count must match the pipeline stages.
         q_smem_layout = sm100_utils.make_smem_layout_a(
             qk_tiled_mma, self.qk_mma_tiler, self.q_dtype, self.q_stage
         )
@@ -751,6 +755,8 @@ class FlashAttention4Sm100CuteDsl:
         )
 
 # @ref flash4-pipelines flash4-2cta-pipelines
+        # The direction in each pipeline name is intentional:
+        # TMA feeds UMMA, UMMA feeds softmax, softmax feeds PV, and MMA feeds correction.
         load_q_producer, load_q_consumer = pipeline.PipelineTmaUmma.create(
             barrier_storage=storage.load_q_mbar_ptr.data_ptr(),
             num_stages=self.q_stage,
@@ -885,6 +891,8 @@ class FlashAttention4Sm100CuteDsl:
 # @end
             kv_head = head_q // problem.head_ratio
 # @ref flash4-q-staging-hd256
+            # Producer count mirrors the consumer loop. HD256 loads two Q slices;
+            # the compact HD128 path loads the single full-head tile.
             for q_iter in cutlass.range(self.q_stage, unroll=1):
                 q_handle = load_q_producer.acquire_and_advance()
                 cute.copy(
@@ -897,6 +905,8 @@ class FlashAttention4Sm100CuteDsl:
 # @end
             for n_tile in cutlass.range(cute.ceil_div(problem.seqlen_k, self.n_block_size), unroll=1):
 # @ref flash4-kv-staging-hd256
+                # K feeds the QK MMA and V feeds the later PV MMA, but both share
+                # the same load/consume pipeline in this compact sketch.
                 for k_iter in cutlass.range(self.iterations_qk, unroll=1):
                     k_handle = load_kv_producer.acquire_and_advance()
                     cute.copy(
@@ -935,6 +945,8 @@ class FlashAttention4Sm100CuteDsl:
                 s_handle = mma_s_producer.acquire_and_advance()
                 tStS_slice = tStS[None, None, None, s_handle.index]
                 qk_tiled_mma.set(tcgen05.Field.ACCUMULATE, False)
+                # In HD256, k_iter walks the two 128-wide D slices. For HD128,
+                # iterations_qk is one and this degenerates to a single QK MMA.
                 for k_iter in cutlass.range(self.iterations_qk, unroll=1):
                     load_q_consumer.wait_and_advance()
                     k_handle = load_kv_consumer.wait_and_advance()
@@ -1051,6 +1063,8 @@ class FlashAttention4Sm100CuteDsl:
 # @ref flash4-softmax-bridge flash4-exp2-log2-scale
                 s_handle = mma_s_consumer.wait_and_advance()
                 scores_log2 = self.load_scores_from_tmem(tStS[None, None, None, s_handle.index])
+                # From here until LSE writeback, row_max is in log2-scaled logit
+                # units: raw QK * softmax_scale * log2(e) * FP8 descale.
                 scores_log2 = scores_log2 * (scale_softmax_log2 * self.load_qk_descale(descale_tensors))
 # @end
 # @ref flash4-fwd-causal-mask
@@ -1075,6 +1089,8 @@ class FlashAttention4Sm100CuteDsl:
 # @ref flash4-softmax-bridge flash4-exp2-apply flash4-skip-rescale-apply
                 probs = scores_log2 - row_max_candidate
                 probs_converted = cute.make_rmem_tensor(probs.shape, self.q_dtype)
+                # apply_exp2_convert mutates probs from log2 residuals into
+                # probabilities, then stores the FP8 version for PV MMA.
                 self.apply_exp2_convert(probs, probs_converted, ex2_emu_freq=8, ex2_emu_res=2)
                 row_sum = row_sum * correction + cute.sum(probs, axis=1)
                 row_max = row_max_candidate
@@ -1106,6 +1122,8 @@ class FlashAttention4Sm100CuteDsl:
                 row_max, row_sum = self.load_softmax_stats()
 # @end
 # @ref flash4-correction-bridge
+                # row_max is already scaled into log2 units, so the correction is
+                # exp2(old - new), with no second softmax_scale factor.
                 scale = cute.math.exp2(old_row_max - row_max, fastmath=True)
                 old_row_max = row_max
                 o_handle = mma_corr_consumer.wait_and_advance()
@@ -1136,18 +1154,21 @@ class FlashAttention4Sm100CuteDsl:
 
     @cute.jit
     def q_gmem_slice(self, tma_q, m_tile, q_iter, head_q, batch):
+        # HD256's extra index is the D-slice; HD128 keeps the full head tile.
         if const_expr(self.head_dim == 256):
             return tma_q[(m_tile, q_iter, (head_q, batch))]
         return tma_q[(m_tile, None, (head_q, batch))]
 
     @cute.jit
     def k_gmem_slice(self, tma_k, n_tile, k_iter, kv_head, batch):
+        # K is split with Q for the QK MMA only when D=256.
         if const_expr(self.head_dim == 256):
             return tma_k[(n_tile, k_iter, (kv_head, batch))]
         return tma_k[(n_tile, None, (kv_head, batch))]
 
     @cute.jit
     def v_gmem_slice(self, tma_v, n_tile, v_iter, kv_head, batch):
+        # V is stored transposed, so the D-slice appears before the K tile.
         if const_expr(self.head_dim_v == 256):
             return tma_v[(v_iter, n_tile, (kv_head, batch))]
         return tma_v[(None, n_tile, (kv_head, batch))]
@@ -1242,6 +1263,8 @@ class FlashAttention4BackwardMmaMap:
         self.each_cta_keeps_accumulator_slice = True
 # @end
 # @ref flash4-2cta-bwd-split-kernels
+        # Current upstream HD256 exposes this split at the wrapper boundary:
+        # the dQ kernel runs first, then the dK/dV kernel drains its tiles.
         self.dedicated_hd256_launch_order = ("dQ kernel", "dK/dV kernel")
         self.dedicated_hd256_uses_dq_semaphores = False
 # @end

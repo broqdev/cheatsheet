@@ -9,9 +9,10 @@ export type LatexBlockSpec = Omit<LatexBlock, 'rows'> & {
   rows: AlgorithmLineSpec[]
 }
 
-export type AttentionContentSpec = Omit<AttentionContent, 'code' | 'rows' | 'notes'> & {
+export type AttentionContentSpec = Omit<AttentionContent, 'code' | 'rows' | 'prelude' | 'notes'> & {
   rawCode: string
   rows: AlgorithmLineSpec[]
+  prelude?: LatexBlockSpec[]
   notes?: LatexBlockSpec[]
   ignoredUnusedRefs?: string[]
 }
@@ -144,6 +145,7 @@ export function defineAttentionContent(spec: AttentionContentSpec): AttentionCon
   const parsedCode = parseCodeRefs(spec.rawCode)
   const usedRefs = new Set<string>()
   const rows = spec.rows.map((line) => resolveLine(line, parsedCode.refIndex, usedRefs))
+  const prelude = spec.prelude?.map((note) => resolveNote(note, parsedCode.refIndex, usedRefs))
   const notes = spec.notes?.map((note) => resolveNote(note, parsedCode.refIndex, usedRefs))
 
   warnUnusedRefs(parsedCode.refIndex, usedRefs, spec.ignoredUnusedRefs)
@@ -152,6 +154,7 @@ export function defineAttentionContent(spec: AttentionContentSpec): AttentionCon
     code: parsedCode.code,
     require: spec.require,
     rows,
+    prelude,
     notes,
   }
 }

@@ -54,12 +54,26 @@ function noteToLatex(note: LatexBlock, index: number) {
   return lines.join('\n')
 }
 
+function partToLatex(part: LatexBlock) {
+  const lines = [`\\textbf{${part.title}}`]
+
+  if (part.require) {
+    lines.push(segmentsToLatex(part.require))
+  }
+
+  lines.push(...part.rows.map(rowToLatex))
+
+  return lines.join('\n')
+}
+
 export function latexDocument(
   example: AttentionExample,
+  prelude: LatexBlock[] | undefined,
   blocks: AlgorithmBlock[],
   notes: LatexBlock[] | undefined
 ) {
   return [
+    ...(prelude?.map(partToLatex) ?? []),
     ...blocks.map((block, index) => blockToLatex(block, index, example)),
     ...(notes?.map((note, noteIndex) => noteToLatex(note, blocks.length + noteIndex)) ?? []),
   ].join('\n\n')

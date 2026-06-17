@@ -33,6 +33,7 @@ export type AttentionContent = {
   require: Segment[]
   rows: AlgorithmLine[]
   code: string
+  prelude?: LatexBlock[]
   notes?: LatexBlock[]
 }
 

@@ -3,7 +3,7 @@ import flashAttention3Code from './code/flashAttention3Gluon.py?raw'
 import causalFlashAttention3Code from './code/causalFlashAttention3Gluon.py?raw'
 import flashAttention3HopperFp8Code from './code/flashAttention3GluonHopperFp8.py?raw'
 import causalFlashAttention3HopperFp8Code from './code/causalFlashAttention3GluonHopperFp8.py?raw'
-import { defineAttentionContent, type AlgorithmLineSpec } from '../../lib/codeRefs'
+import { defineAttentionContent, type AlgorithmLineSpec, type LatexBlockSpec } from '../../lib/codeRefs'
 import { math, strong, text } from '../../lib/segments'
 
 const mappedCodeRefIds = new Set([
@@ -71,6 +71,7 @@ const mappedCodeRefIds = new Set([
   'flash3-bwd-dv',
   'flash3-bwd-dk',
   'flash3-bwd-dq-local',
+  'flash3-bwd-dq-writer-else-if',
   'flash3-bwd-dq-writer-loop',
   'flash3-bwd-dq-ready',
   'flash3-bwd-dq-atomic',
@@ -160,6 +161,65 @@ function withHopperFp8Require(require: Segment[]) {
 
 const hopperFp8Flash3ForwardRequire = withHopperFp8Require(flash3ForwardRequire)
 const causalHopperFp8Flash3ForwardRequire = withHopperFp8Require(causalFlash3ForwardRequire)
+
+const flash3HardwarePrelude: LatexBlockSpec[] = [
+  {
+    id: 'flash3-hardware',
+    title: 'Hardware',
+    require: [
+      text('Hopper hardware features'),
+    ],
+    rows: [
+      addCodeRefs(
+        row('flash3-hardware-tma', [
+          strong('Direct-to-SMEM transfers (TMA). '),
+          text('The Tensor Memory Accelerator lets producer warp groups issue asynchronous loads that move multidimensional Q/K/V tiles from HBM directly into shared memory, bypassing the register file and avoiding scalarized memory copies.'),
+        ]),
+        'flash3-cta-pipeline',
+        'flash3-cta-load-q',
+        'flash3-cta-load-kv'
+      ),
+      addCodeRefs(
+        row('flash3-hardware-mma', [
+          strong('Tensor-core tile math (MMA). '),
+          text('Matrix multiply-accumulate is the tensor-core operation that computes '),
+          math(String.raw`D=A B + C`),
+          text(' for matrix fragments. In FlashAttention-3, the QK score product and PV output product are the MMA-shaped tile computations that Hopper WGMMA executes.'),
+        ]),
+        'flash3-cta-score',
+        'flash3-cta-output',
+        'flash3-consumer-score-cur',
+        'flash3-consumer-output-prev'
+      ),
+      addCodeRefs(
+        row('flash3-hardware-wgmma', [
+          strong('Direct SMEM consumption (WGMMA). '),
+          text('Warp-Group MMA instructions let tensor cores compute matrix multiplications by reading operands straight from staged shared-memory tiles, instead of requiring warps to load those operands into registers first.'),
+        ]),
+        'flash3-cta-score',
+        'flash3-cta-output',
+        'flash3-consumer-score-cur',
+        'flash3-consumer-output-prev'
+      ),
+      addCodeRefs(
+        row('flash3-hardware-circular-buffers', [
+          strong('Asynchronous circular buffers. '),
+          text('The code sets up an '),
+          math(String.raw`s`),
+          text('-stage circular pipeline in shared memory via '),
+          math(String.raw`\mathrm{SmemChannel}`),
+          text(' and '),
+          math(String.raw`\mathrm{gl.allocate\_shared\_memory}`),
+          text(', so TMA can fetch future tiles in the background while WGMMA computes on the current tiles.'),
+        ]),
+        'flash3-cta-pipeline',
+        'flash3-cta-producer-loop',
+        'flash3-cta-wait-stage',
+        'flash3-cta-consumer-loop'
+      ),
+    ],
+  },
+]
 
 const flash3Rows: AlgorithmLineSpec[] = [
   row('flash3-cta-forward-label', [
@@ -259,7 +319,7 @@ const flash3Rows: AlgorithmLineSpec[] = [
   ], 2),
   row('flash3-cta-output', [
     text('Compute '),
-    math(String.raw`O_i=\operatorname{diag}(\exp(m_i^{\mathrm{old}}-m_i))^{-1}O_i+\tilde P_i^{(j)}V_j`),
+    math(String.raw`O_i=\operatorname{diag}(\exp(m_i^{\mathrm{old}}-m_i))O_i+\tilde P_i^{(j)}V_j`),
     text(' (RS-GEMM). Commit and wait.'),
   ], 2),
   row('flash3-cta-release', [
@@ -628,11 +688,11 @@ const flash3Rows: AlgorithmLineSpec[] = [
     text(' to be ready in SMEM.'),
   ], 2),
   row('flash3-bwd-dq-atomic', [
-    text('Using a semaphore, atomically add '),
-    math(String.raw`dQ_i^{(\mathrm{local})}`),
-    text(' to '),
+    text('The '),
+    math(String.raw`dQ`),
+    text('-writer stores the first partial for each '),
     math(String.raw`dQ_i`),
-    text(' in global memory.'),
+    text(' and atomically accumulates later key-block partials.'),
   ], 2),
   row('flash3-bwd-dq-writer-end', [strong('end for')], 1),
   row('flash3-bwd-end-if', [strong('end if')]),
@@ -830,7 +890,7 @@ function withHopperFp8Rows(row: AlgorithmLineSpec): AlgorithmLineSpec {
           text(' to ', 'fp8'),
           math(String.raw`\mathrm{gl.float8e5}`, 'fp8'),
           text(' and compute '),
-          math(String.raw`O_i=\operatorname{diag}(\exp(m_i^{\mathrm{old}}-m_i))^{-1}O_i+\tilde P_i^{(j)}\widehat V_j`, 'fp8'),
+          math(String.raw`O_i=\operatorname{diag}(\exp(m_i^{\mathrm{old}}-m_i))O_i+\tilde P_i^{(j)}\widehat V_j`, 'fp8'),
           text(' (RS-GEMM). Commit and wait; ', 'fp8'),
           math(String.raw`d_V`, 'fp8'),
           text(' is applied in the epilogue.', 'fp8'),
@@ -938,18 +998,20 @@ export const flashAttention3Example: AttentionExample = {
   urlTag: 'flash-attention-3',
   label: 'FlashAttention-3',
   description:
-    'FlashAttention-3 maps exact tiled attention onto NVIDIA Hopper SM 90 with TMA, WGMMA, and warp-specialized producer, consumer, and dQ-writer pipelines.',
+    'FlashAttention-3 refines exact tiled attention for Hopper with stronger overlap and faster on-chip execution.',
   algorithmTitle: 'FlashAttention-3',
   content: {
     unmasked: defineAttentionContent({
       rawCode: flashAttention3Code,
       require: flash3ForwardRequire,
+      prelude: flash3HardwarePrelude,
       rows: flash3Rows,
       ignoredUnusedRefs: [...causalCodeRefIds, ...fp8CodeRefIds],
     }),
     masked: defineAttentionContent({
       rawCode: causalFlashAttention3Code,
       require: causalFlash3ForwardRequire,
+      prelude: flash3HardwarePrelude,
       rows: causalFlash3Rows,
       ignoredUnusedRefs: fp8CodeRefIds,
     }),
@@ -958,12 +1020,14 @@ export const flashAttention3Example: AttentionExample = {
     unmasked: defineAttentionContent({
       rawCode: flashAttention3HopperFp8Code,
       require: hopperFp8Flash3ForwardRequire,
+      prelude: flash3HardwarePrelude,
       rows: hopperFp8Flash3Rows,
       ignoredUnusedRefs: causalCodeRefIds,
     }),
     masked: defineAttentionContent({
       rawCode: causalFlashAttention3HopperFp8Code,
       require: causalHopperFp8Flash3ForwardRequire,
+      prelude: flash3HardwarePrelude,
       rows: causalHopperFp8Flash3Rows,
     }),
   },

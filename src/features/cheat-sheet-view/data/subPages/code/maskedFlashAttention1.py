@@ -11,6 +11,14 @@ def flash1_fwd(Q, K, V, M, O, ell, m, alpha: tl.constexpr, N_CTX: tl.constexpr):
     offs_m = tl.arange(0, Br)
     offs_n = tl.arange(0, Bc)
     offs_d = tl.arange(0, HEAD_DIM)
+
+    o_zero = tl.zeros((Br, HEAD_DIM), tl.float32)
+    ell_zero = tl.zeros((Br,), tl.float32)
+    m_init = tl.full((Br,), -float("inf"), tl.float32)
+    for i in range(0, N_CTX, Br):
+        tl.store(O + (i + offs_m)[:, None] * STRIDE_OM + offs_d[None, :], o_zero)
+        tl.store(ell + i + offs_m, ell_zero)
+        tl.store(m + i + offs_m, m_init)
 # @end
 
 # @ref fwd-loop-kv
@@ -83,6 +91,15 @@ def flash1_bwd(Q, K, V, M, O, dO, ell, m, dQ, dK, dV, alpha: tl.constexpr, N_CTX
     offs_m = tl.arange(0, Br)
     offs_n = tl.arange(0, Bc)
     offs_d = tl.arange(0, HEAD_DIM)
+
+    dq_zero = tl.zeros((Br, HEAD_DIM), tl.float32)
+    dk_zero = tl.zeros((Bc, HEAD_DIM), tl.float32)
+    dv_zero = tl.zeros((Bc, HEAD_DIM), tl.float32)
+    for i in range(0, N_CTX, Br):
+        tl.store(dQ + (i + offs_m)[:, None] * STRIDE_DQM + offs_d[None, :], dq_zero)
+    for j in range(0, N_CTX, Bc):
+        tl.store(dK + (j + offs_n)[:, None] * STRIDE_DKN + offs_d[None, :], dk_zero)
+        tl.store(dV + (j + offs_n)[:, None] * STRIDE_DVN + offs_d[None, :], dv_zero)
 # @end
 
 # @ref bwd-loop-kv

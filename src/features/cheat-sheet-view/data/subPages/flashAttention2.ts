@@ -541,7 +541,7 @@ const flash2Rows: AlgorithmLineSpec[] = [
     indent: 2,
     parts: [
       text('On chip, compute '),
-      math(String.raw`dK_j\leftarrow dK_j+(dS_i^{(j)})^\top Q_i`),
+      math(String.raw`dK_j\leftarrow dK_j+\alpha(dS_i^{(j)})^\top Q_i`),
       text('.'),
     ],
     codeRefs: ['flash2-bwd-dk'],
@@ -1087,7 +1087,7 @@ const causalFlash2Rows: AlgorithmLineSpec[] = [
     indent: 2,
     parts: [
       text('On chip, compute '),
-      math(String.raw`dK_j\leftarrow dK_j+(dS_i^{(j)})^\top Q_i`),
+      math(String.raw`dK_j\leftarrow dK_j+\alpha(dS_i^{(j)})^\top Q_i`),
       text('.'),
     ],
     codeRefs: ['flash2-causal-bwd-dk'],
