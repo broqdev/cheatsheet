@@ -6,11 +6,11 @@ product
 
 ## Users
 
-ML engineers, CUDA/Triton learners, and attention-paper readers use this as a focused reference while studying how equations map onto implementation.
+ML engineers, CUDA/Triton learners, and paper readers use this as a focused reference while studying how equations map onto implementation.
 
 ## Product Purpose
 
-Broq Cheatsheet presents attention algorithms as compact paper-style math beside syntax-highlighted code. Success means users can switch variants, inspect equations, and understand the corresponding implementation path without losing context.
+Broq Cheatsheet presents ML algorithms as compact paper-style math beside syntax-highlighted code. Success means users can switch variants, inspect equations, and understand the corresponding implementation path without losing context.
 
 ## Brand Personality
 

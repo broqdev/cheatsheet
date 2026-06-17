@@ -1,4 +1,4 @@
-import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react'
+import { type KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { catalogSections } from '../data/attentionExamples'
 import type { CatalogItem } from '../model'
 
@@ -44,6 +44,26 @@ function filteredCatalogSections(query: string) {
     .filter((section) => section.items.length > 0)
 }
 
+function selectableCatalogItems(query: string) {
+  return filteredCatalogSections(query)
+    .flatMap((section) => section.items)
+    .filter((item) => item.exampleId)
+}
+
+function catalogOptionId(itemId: string) {
+  return `catalog-option-${itemId}`
+}
+
+const editableTargetSelector =
+  'input, textarea, select, [contenteditable="true"], [contenteditable="plaintext-only"]'
+
+function isTextEntryTarget(target: EventTarget | null) {
+  return (
+    target instanceof HTMLElement &&
+    (target.isContentEditable || Boolean(target.closest(editableTargetSelector)))
+  )
+}
+
 type CatalogDropdownProps = {
   activeLabel: string
   activeExampleId: string
@@ -57,10 +77,41 @@ export function CatalogDropdown({
 }: CatalogDropdownProps) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
+  const [activeItemId, setActiveItemId] = useState<string | null>(null)
   const rootRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const itemButtonRefs = useRef(new Map<string, HTMLButtonElement>())
   const sections = useMemo(() => filteredCatalogSections(query), [query])
-  const firstSelectableItem = sections.flatMap((section) => section.items).find((item) => item.exampleId)
+  const selectableItems = useMemo(() => selectableCatalogItems(query), [query])
+  const firstSelectableItem = selectableItems[0]
+  const activeItem =
+    selectableItems.find((item) => item.id === activeItemId) ?? firstSelectableItem
+  const activeOptionId = activeItem ? catalogOptionId(activeItem.id) : undefined
+
+  function defaultActiveItemIdForQuery(nextQuery: string) {
+    const nextItems = selectableCatalogItems(nextQuery)
+
+    if (!nextItems.length) {
+      return null
+    }
+
+    if (nextQuery.trim()) {
+      return nextItems[0].id
+    }
+
+    return nextItems.find((item) => item.exampleId === activeExampleId)?.id ?? nextItems[0].id
+  }
+
+  const openSearch = useCallback((options?: { preserveQuery?: boolean }) => {
+    setOpen(true)
+
+    if (!options?.preserveQuery) {
+      setQuery('')
+      setActiveItemId(defaultActiveItemIdForQuery(''))
+    }
+
+    window.setTimeout(() => inputRef.current?.focus(), 0)
+  }, [activeExampleId])
 
   useEffect(() => {
     if (!open) {
@@ -78,15 +129,33 @@ export function CatalogDropdown({
     return () => document.removeEventListener('pointerdown', handlePointerDown)
   }, [open])
 
-  function openSearch() {
-    setOpen(true)
-    setQuery('')
-    window.setTimeout(() => inputRef.current?.focus(), 0)
-  }
+  useEffect(() => {
+    function handleCatalogHotkey(event: globalThis.KeyboardEvent) {
+      if (
+        event.defaultPrevented ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.altKey ||
+        event.shiftKey ||
+        event.key.toLowerCase() !== 'f' ||
+        isTextEntryTarget(event.target)
+      ) {
+        return
+      }
+
+      event.preventDefault()
+      openSearch({ preserveQuery: open })
+    }
+
+    document.addEventListener('keydown', handleCatalogHotkey)
+
+    return () => document.removeEventListener('keydown', handleCatalogHotkey)
+  }, [open, openSearch])
 
   function closeSearch() {
     setOpen(false)
     setQuery('')
+    setActiveItemId(null)
   }
 
   function selectItem(item: CatalogItem) {
@@ -98,15 +167,75 @@ export function CatalogDropdown({
     closeSearch()
   }
 
+  function targetCatalogItem(index: number) {
+    if (!selectableItems.length) {
+      return
+    }
+
+    const nextIndex = (index + selectableItems.length) % selectableItems.length
+    const nextItem = selectableItems[nextIndex]
+    const nextButton = itemButtonRefs.current.get(nextItem.id)
+
+    setActiveItemId(nextItem.id)
+    nextButton?.scrollIntoView({ block: 'nearest' })
+  }
+
+  function activeItemIndex() {
+    return selectableItems.findIndex((item) => item.id === activeItem?.id)
+  }
+
+  function moveActiveCatalogItem(offset: number) {
+    const currentIndex = activeItemIndex()
+
+    targetCatalogItem(currentIndex >= 0 ? currentIndex + offset : 0)
+  }
+
+  function updateQuery(nextQuery: string) {
+    setQuery(nextQuery)
+    setActiveItemId(defaultActiveItemIdForQuery(nextQuery))
+  }
+
   function handleSearchKeyDown(event: KeyboardEvent<HTMLInputElement>) {
     if (event.key === 'Escape') {
       event.preventDefault()
       closeSearch()
     }
 
-    if (event.key === 'Enter' && firstSelectableItem) {
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault()
-      selectItem(firstSelectableItem)
+      moveActiveCatalogItem(event.key === 'ArrowDown' ? 1 : -1)
+    }
+
+    if (event.key === 'Enter' && activeItem) {
+      event.preventDefault()
+      selectItem(activeItem)
+    }
+  }
+
+  function handleItemKeyDown(event: KeyboardEvent<HTMLButtonElement>, item: CatalogItem) {
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      closeSearch()
+      return
+    }
+
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault()
+      inputRef.current?.focus({ preventScroll: true })
+      moveActiveCatalogItem(event.key === 'ArrowDown' ? 1 : -1)
+      return
+    }
+
+    if (event.key === 'Home' || event.key === 'End') {
+      event.preventDefault()
+      inputRef.current?.focus({ preventScroll: true })
+      targetCatalogItem(event.key === 'Home' ? 0 : selectableItems.length - 1)
+      return
+    }
+
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      selectItem(item)
     }
   }
 
@@ -119,11 +248,12 @@ export function CatalogDropdown({
           value={query}
           role="combobox"
           aria-autocomplete="list"
+          aria-activedescendant={activeOptionId}
           aria-controls="catalog-list"
           aria-expanded="true"
           aria-label="Search cheatsheet catalog"
           placeholder="Search catalog"
-          onChange={(event) => setQuery(event.currentTarget.value)}
+          onChange={(event) => updateQuery(event.currentTarget.value)}
           onKeyDown={handleSearchKeyDown}
         />
       ) : (
@@ -132,9 +262,11 @@ export function CatalogDropdown({
           className="catalog-trigger"
           aria-haspopup="listbox"
           aria-expanded="false"
-          onClick={openSearch}
+          aria-keyshortcuts="F"
+          onClick={() => openSearch()}
         >
-          <span>{activeLabel}</span>
+          <span className="catalog-active-label">{activeLabel}</span>
+          <kbd className="catalog-hotkey" aria-hidden="true">F</kbd>
           <span className="catalog-caret" aria-hidden="true" />
         </button>
       )}
@@ -148,18 +280,29 @@ export function CatalogDropdown({
                 <div className="catalog-children">
                   {section.items.map((item) => {
                     const selected = item.exampleId === activeExampleId
+                    const active = item.id === activeItem?.id
                     const disabled = !item.exampleId
 
                     return (
                       <button
                         key={item.id}
                         type="button"
-                        className={`catalog-item${selected ? ' selected' : ''}`}
+                        className={`catalog-item${selected ? ' selected' : ''}${active ? ' active' : ''}`}
                         aria-disabled={disabled}
                         aria-selected={selected}
                         disabled={disabled}
+                        id={catalogOptionId(item.id)}
+                        ref={(node) => {
+                          if (node) {
+                            itemButtonRefs.current.set(item.id, node)
+                          } else {
+                            itemButtonRefs.current.delete(item.id)
+                          }
+                        }}
                         role="option"
                         onClick={() => selectItem(item)}
+                        onFocus={() => setActiveItemId(item.id)}
+                        onKeyDown={(event) => handleItemKeyDown(event, item)}
                       >
                         {item.label}
                       </button>
@@ -176,4 +319,3 @@ export function CatalogDropdown({
     </div>
   )
 }
-

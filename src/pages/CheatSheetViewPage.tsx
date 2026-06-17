@@ -5,7 +5,10 @@ import { CatalogDropdown } from '../features/cheat-sheet-view/components/Catalog
 import { CheatsheetSummary } from '../features/cheat-sheet-view/components/CheatsheetSummary'
 import { CodePanel } from '../features/cheat-sheet-view/components/CodePanel'
 import { ExampleTabs } from '../features/cheat-sheet-view/components/ExampleTabs'
-import { examples } from '../features/cheat-sheet-view/data/attentionExamples'
+import {
+  examples,
+  examplesForExampleGroup,
+} from '../features/cheat-sheet-view/data/attentionExamples'
 import { algorithmBlocks } from '../features/cheat-sheet-view/lib/algorithmBlocks'
 import { copyTextToClipboard } from '../features/cheat-sheet-view/lib/clipboard'
 import { highlightedCodeLines } from '../features/cheat-sheet-view/lib/highlightCode'
@@ -79,13 +82,23 @@ function exampleFromLocation() {
 }
 
 function canonicalPathForExample(example: AttentionExample) {
-  return `${siteBasePath()}${encodeURIComponent(normalizeUrlTag(example.urlTag))}`
+  const routePath = example.urlTag
+    .split('/')
+    .map(normalizeUrlTag)
+    .filter(Boolean)
+    .map(encodeURIComponent)
+    .join('/')
+
+  return `${siteBasePath()}${routePath}`
 }
 
 type ToggleQueryState = {
   attentionMaskEnabled: boolean
   dropoutEnabled: boolean
   fp8Enabled: boolean
+  weightDecayEnabled: boolean
+  moonshotLrEnabled: boolean
+  momentumEnabled: boolean
 }
 
 function queryToggleEnabled(params: URLSearchParams, key: string) {
@@ -101,6 +114,14 @@ function toggleStateFromSearch(search: string): ToggleQueryState {
     attentionMaskEnabled: queryToggleEnabled(params, 'mask'),
     dropoutEnabled: queryToggleEnabled(params, 'dropout'),
     fp8Enabled: queryToggleEnabled(params, 'fp8'),
+    weightDecayEnabled:
+      queryToggleEnabled(params, 'weightDecay') || queryToggleEnabled(params, 'wd'),
+    moonshotLrEnabled:
+      queryToggleEnabled(params, 'moonshotLr') ||
+      queryToggleEnabled(params, 'moonshot') ||
+      queryToggleEnabled(params, 'mslr'),
+    momentumEnabled:
+      queryToggleEnabled(params, 'momentum') || queryToggleEnabled(params, 'mom'),
   }
 }
 
@@ -108,11 +129,16 @@ function attentionModeForState(toggleState: ToggleQueryState): AttentionMode {
   return toggleState.attentionMaskEnabled ? 'masked' : 'unmasked'
 }
 
+function hasAttentionMaskToggle(example: AttentionExample) {
+  return example.content.masked !== example.content.unmasked
+}
+
 function availableToggleState(example: AttentionExample, toggleState: ToggleQueryState) {
-  const attentionMode = attentionModeForState(toggleState)
+  const attentionMaskEnabled = hasAttentionMaskToggle(example) && toggleState.attentionMaskEnabled
+  const attentionMode = attentionModeForState({ ...toggleState, attentionMaskEnabled })
 
   return {
-    attentionMaskEnabled: toggleState.attentionMaskEnabled,
+    attentionMaskEnabled,
     dropoutEnabled:
       toggleState.dropoutEnabled &&
       example.id === 'flash1' &&
@@ -121,6 +147,15 @@ function availableToggleState(example: AttentionExample, toggleState: ToggleQuer
       toggleState.fp8Enabled &&
       example.id === 'flash3' &&
       Boolean(example.fp8Content?.[attentionMode]),
+    weightDecayEnabled:
+      toggleState.weightDecayEnabled &&
+      Boolean(example.weightDecayContent?.[attentionMode]),
+    moonshotLrEnabled:
+      toggleState.moonshotLrEnabled &&
+      Boolean(example.moonshotLrContent?.[attentionMode]),
+    momentumEnabled:
+      toggleState.momentumEnabled &&
+      Boolean(example.momentumContent?.[attentionMode]),
   }
 }
 
@@ -135,7 +170,19 @@ function searchForToggleState(example: AttentionExample, toggleState: ToggleQuer
   const params = new URLSearchParams(window.location.search)
   const availableState = availableToggleState(example, toggleState)
 
-  for (const key of ['sync', 'mask', 'dropout', 'fp8']) {
+  for (const key of [
+    'sync',
+    'mask',
+    'dropout',
+    'fp8',
+    'weightDecay',
+    'wd',
+    'moonshotLr',
+    'moonshot',
+    'mslr',
+    'momentum',
+    'mom',
+  ]) {
     params.delete(key)
   }
 
@@ -149,6 +196,18 @@ function searchForToggleState(example: AttentionExample, toggleState: ToggleQuer
 
   if (availableState.fp8Enabled) {
     params.set('fp8', 'on')
+  }
+
+  if (availableState.weightDecayEnabled) {
+    params.set('weightDecay', 'on')
+  }
+
+  if (availableState.moonshotLrEnabled) {
+    params.set('moonshotLr', 'on')
+  }
+
+  if (availableState.momentumEnabled) {
+    params.set('momentum', 'on')
   }
 
   const nextSearch = params.toString()
@@ -171,6 +230,15 @@ function CheatSheetViewPage() {
   const [fp8Enabled, setFp8Enabled] = useState(
     () => viewStateFromLocation().toggleState.fp8Enabled
   )
+  const [weightDecayEnabled, setWeightDecayEnabled] = useState(
+    () => viewStateFromLocation().toggleState.weightDecayEnabled
+  )
+  const [moonshotLrEnabled, setMoonshotLrEnabled] = useState(
+    () => viewStateFromLocation().toggleState.moonshotLrEnabled
+  )
+  const [momentumEnabled, setMomentumEnabled] = useState(
+    () => viewStateFromLocation().toggleState.momentumEnabled
+  )
   const [copiedTarget, setCopiedTarget] = useState<CopyTarget | null>(null)
   const codeRegionRef = useRef<HTMLDivElement>(null)
 
@@ -178,13 +246,45 @@ function CheatSheetViewPage() {
   const attentionMode: AttentionMode = attentionMaskEnabled ? 'masked' : 'unmasked'
   const dropoutContent = activeExample.dropoutContent?.[attentionMode]
   const fp8Content = activeExample.fp8Content?.[attentionMode]
+  const weightDecayContent = activeExample.weightDecayContent?.[attentionMode]
+  const moonshotLrContent = activeExample.moonshotLrContent?.[attentionMode]
+  const moonshotLrWeightDecayContent =
+    activeExample.moonshotLrWeightDecayContent?.[attentionMode]
+  const momentumContent = activeExample.momentumContent?.[attentionMode]
+  const momentumWeightDecayContent = activeExample.momentumWeightDecayContent?.[attentionMode]
+  const attentionMaskAvailable = hasAttentionMaskToggle(activeExample)
   const dropoutAvailable = activeExample.id === 'flash1' && Boolean(dropoutContent)
   const fp8Available = activeExample.id === 'flash3' && Boolean(fp8Content)
+  const weightDecayAvailable = Boolean(weightDecayContent)
+  const moonshotLrAvailable = Boolean(moonshotLrContent)
+  const momentumAvailable = Boolean(momentumContent)
+  const activeGroupExamples = useMemo(
+    () => examplesForExampleGroup(activeExample.id),
+    [activeExample.id]
+  )
   const activeContent =
-    fp8Enabled && fp8Available && fp8Content
+    momentumEnabled &&
+    momentumAvailable &&
+    weightDecayEnabled &&
+    weightDecayAvailable &&
+    momentumWeightDecayContent
+      ? momentumWeightDecayContent
+      : moonshotLrEnabled &&
+        moonshotLrAvailable &&
+        weightDecayEnabled &&
+        weightDecayAvailable &&
+        moonshotLrWeightDecayContent
+      ? moonshotLrWeightDecayContent
+      : fp8Enabled && fp8Available && fp8Content
       ? fp8Content
       : dropoutEnabled && dropoutAvailable && dropoutContent
       ? dropoutContent
+      : momentumEnabled && momentumAvailable && momentumContent
+      ? momentumContent
+      : moonshotLrEnabled && moonshotLrAvailable && moonshotLrContent
+      ? moonshotLrContent
+      : weightDecayEnabled && weightDecayAvailable && weightDecayContent
+      ? weightDecayContent
       : activeExample.content[attentionMode]
   const activeLineId = selectedLineId ?? hoveredLineId
   const selectableRows = [
@@ -241,6 +341,9 @@ function CheatSheetViewPage() {
       attentionMaskEnabled,
       dropoutEnabled,
       fp8Enabled,
+      weightDecayEnabled,
+      moonshotLrEnabled,
+      momentumEnabled,
     }
   }
 
@@ -248,6 +351,9 @@ function CheatSheetViewPage() {
     setAttentionMaskEnabled(toggleState.attentionMaskEnabled)
     setDropoutEnabled(toggleState.dropoutEnabled)
     setFp8Enabled(toggleState.fp8Enabled)
+    setWeightDecayEnabled(toggleState.weightDecayEnabled)
+    setMoonshotLrEnabled(toggleState.moonshotLrEnabled)
+    setMomentumEnabled(toggleState.momentumEnabled)
   }
 
   function replaceUrlForToggleState(example: AttentionExample, toggleState: ToggleQueryState) {
@@ -290,6 +396,10 @@ function CheatSheetViewPage() {
   }
 
   function toggleAttentionMask(enabled: boolean) {
+    if (enabled && !attentionMaskAvailable) {
+      return
+    }
+
     const nextToggleState = availableToggleState(activeExample, {
       ...currentToggleState(),
       attentionMaskEnabled: enabled,
@@ -323,6 +433,51 @@ function CheatSheetViewPage() {
     const nextToggleState = availableToggleState(activeExample, {
       ...currentToggleState(),
       fp8Enabled: enabled,
+    })
+
+    applyToggleState(nextToggleState)
+    resetExampleState()
+    replaceUrlForToggleState(activeExample, nextToggleState)
+  }
+
+  function toggleWeightDecay(enabled: boolean) {
+    if (enabled && !weightDecayAvailable) {
+      return
+    }
+
+    const nextToggleState = availableToggleState(activeExample, {
+      ...currentToggleState(),
+      weightDecayEnabled: enabled,
+    })
+
+    applyToggleState(nextToggleState)
+    resetExampleState()
+    replaceUrlForToggleState(activeExample, nextToggleState)
+  }
+
+  function toggleMoonshotLr(enabled: boolean) {
+    if (enabled && !moonshotLrAvailable) {
+      return
+    }
+
+    const nextToggleState = availableToggleState(activeExample, {
+      ...currentToggleState(),
+      moonshotLrEnabled: enabled,
+    })
+
+    applyToggleState(nextToggleState)
+    resetExampleState()
+    replaceUrlForToggleState(activeExample, nextToggleState)
+  }
+
+  function toggleMomentum(enabled: boolean) {
+    if (enabled && !momentumAvailable) {
+      return
+    }
+
+    const nextToggleState = availableToggleState(activeExample, {
+      ...currentToggleState(),
+      momentumEnabled: enabled,
     })
 
     applyToggleState(nextToggleState)
@@ -421,7 +576,7 @@ function CheatSheetViewPage() {
   }
 
   return (
-    <main className="workspace" aria-label="Attention equation and code explorer">
+    <main className="workspace" aria-label="Equation and code explorer">
       <header className="cheatsheet-header">
         <div className="cheatsheet-title">
           <h1>Broq Cheatsheet</h1>
@@ -437,7 +592,7 @@ function CheatSheetViewPage() {
 
       <section
         className="main-panel"
-        id="attention-panel"
+        id="cheatsheet-panel"
         aria-label={`${activeExample.label} equations and code`}
         role="tabpanel"
       >
@@ -466,20 +621,30 @@ function CheatSheetViewPage() {
       </section>
 
       <AttentionControls
+        attentionMaskAvailable={attentionMaskAvailable}
         attentionMaskEnabled={attentionMaskEnabled}
         attentionMaskLabel={activeExample.id === 'flash2' || activeExample.id === 'flash3' ? 'Causal Attention' : 'Attention mask'}
         dropoutAvailable={dropoutAvailable}
         dropoutEnabled={dropoutEnabled}
         fp8Available={fp8Available}
         fp8Enabled={fp8Enabled}
+        weightDecayAvailable={weightDecayAvailable}
+        weightDecayEnabled={weightDecayEnabled}
+        moonshotLrAvailable={moonshotLrAvailable}
+        moonshotLrEnabled={moonshotLrEnabled}
+        momentumAvailable={momentumAvailable}
+        momentumEnabled={momentumEnabled}
         onToggleDropout={toggleDropout}
         onToggleFp8={toggleFp8}
         onToggleAttentionMask={toggleAttentionMask}
+        onToggleWeightDecay={toggleWeightDecay}
+        onToggleMoonshotLr={toggleMoonshotLr}
+        onToggleMomentum={toggleMomentum}
       />
 
       <ExampleTabs
         activeExample={activeExample}
-        examples={examples}
+        examples={activeGroupExamples}
         onSwitchExample={switchExample}
       />
     </main>

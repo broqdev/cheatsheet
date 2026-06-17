@@ -938,7 +938,7 @@ export const flashAttention3Example: AttentionExample = {
   urlTag: 'flash-attention-3',
   label: 'FlashAttention-3',
   description:
-    'FlashAttention-3 targets NVIDIA Hopper with asynchronous, warp-specialized producer, consumer, and dQ-writer pipelines for exact tiled attention.',
+    'FlashAttention-3 maps exact tiled attention onto NVIDIA Hopper SM 90 with TMA, WGMMA, and warp-specialized producer, consumer, and dQ-writer pipelines.',
   algorithmTitle: 'FlashAttention-3',
   content: {
     unmasked: defineAttentionContent({

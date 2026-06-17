@@ -8,7 +8,7 @@ type ExampleTabsProps = {
 
 export function ExampleTabs({ activeExample, examples, onSwitchExample }: ExampleTabsProps) {
   return (
-    <nav className="example-nav" aria-label="Attention variant selector">
+    <nav className="example-nav" aria-label="Cheatsheet page selector">
       <div className="example-nav-track" role="tablist">
         {examples.map((example) => {
           const isActive = example.id === activeExample.id
@@ -18,7 +18,7 @@ export function ExampleTabs({ activeExample, examples, onSwitchExample }: Exampl
               key={example.id}
               type="button"
               className={isActive ? 'active' : ''}
-              aria-controls="attention-panel"
+              aria-controls="cheatsheet-panel"
               aria-current={isActive ? 'page' : undefined}
               aria-selected={isActive}
               onClick={() => onSwitchExample(example.id)}

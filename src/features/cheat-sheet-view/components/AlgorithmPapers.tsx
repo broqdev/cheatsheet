@@ -121,14 +121,14 @@ export function AlgorithmPapers({
         </article>
       ))}
 
-      {notes?.map((note) => (
+      {notes?.map((note, noteIndex) => (
         <article
           className="algorithm-paper latex-block"
           key={note.id}
           aria-label={`${activeExample.label} ${note.title}`}
         >
           <header className="algorithm-header">
-            <strong>LaTeX</strong>
+            <strong>Algorithm {blocks.length + noteIndex + 1}</strong>
             <h2>{note.title}</h2>
           </header>
           {note.require ? (

@@ -11,7 +11,7 @@ const base = process.env.VITE_BASE_PATH ?? githubPagesBase
 
 const siteTitle = 'Broq Cheatsheet'
 const siteDescription =
-  'Broq Cheatsheet maps naive attention, FlashAttention-1, FlashAttention-2, and FlashAttention-3 equations to the PyTorch and Triton-style code beside them.'
+  'Broq Cheatsheet maps ML algorithms such as attention variants and SGD from paper-style equations to PyTorch and Triton-style code.'
 
 function withTrailingSlash(value: string) {
   return value.endsWith('/') ? value : `${value}/`
@@ -44,7 +44,7 @@ function seoPlugin(): Plugin {
     '@context': 'https://schema.org',
     '@type': ['WebApplication', 'LearningResource'],
     name: siteTitle,
-    alternateName: 'Attention Math and Code',
+    alternateName: 'ML Math and Code',
     description: siteDescription,
     url: canonicalUrl,
     applicationCategory: 'EducationalApplication',
@@ -60,6 +60,8 @@ function seoPlugin(): Plugin {
       { '@type': 'Thing', name: 'Naive attention' },
       { '@type': 'Thing', name: 'Attention mechanism' },
       { '@type': 'Thing', name: 'Online softmax' },
+      { '@type': 'Thing', name: 'Stochastic gradient descent' },
+      { '@type': 'Thing', name: 'Optimization algorithms' },
       { '@type': 'Thing', name: 'Triton kernels' },
     ],
     teaches: [
@@ -70,6 +72,8 @@ function seoPlugin(): Plugin {
       'FlashAttention-3 warp specialization',
       'Masked attention',
       'Softmax backward pass',
+      'SGD parameter updates',
+      'Momentum and Nesterov updates',
     ],
   }
 

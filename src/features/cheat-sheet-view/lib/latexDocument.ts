@@ -42,8 +42,8 @@ function blockToLatex(block: AlgorithmBlock, index: number, example: AttentionEx
   ].join('\n')
 }
 
-function noteToLatex(note: LatexBlock) {
-  const lines = [`\\textbf{LaTeX} ${note.title}`]
+function noteToLatex(note: LatexBlock, index: number) {
+  const lines = [`\\textbf{Algorithm ${index + 1}} ${note.title}`]
 
   if (note.require) {
     lines.push(`\\textbf{${note.requireLabel ?? 'Given'}:} ${segmentsToLatex(note.require)}`)
@@ -61,6 +61,6 @@ export function latexDocument(
 ) {
   return [
     ...blocks.map((block, index) => blockToLatex(block, index, example)),
-    ...(notes?.map(noteToLatex) ?? []),
+    ...(notes?.map((note, noteIndex) => noteToLatex(note, blocks.length + noteIndex)) ?? []),
   ].join('\n\n')
 }
