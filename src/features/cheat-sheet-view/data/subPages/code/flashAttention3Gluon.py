@@ -264,8 +264,11 @@ def _flash3_fwd_compute(config, channels, descs, M):
         mbarrier.arrive(k_empty)
 # @end
 
-# @ref flash3-cta-rowmax
+# @ref flash3-cta-score flash3-consumer-score-cur
         s_cur = qk_acc * config.qk_scale
+# @end
+
+# @ref flash3-cta-rowmax
         m_next = gl.maximum(m_i, gl.max(s_cur, axis=1))
 # @end
 
@@ -309,8 +312,11 @@ def _flash3_fwd_compute(config, channels, descs, M):
             mbarrier.arrive(k_empty)
 # @end
 
-# @ref flash3-consumer-online-next
+# @ref flash3-consumer-score-next flash3-consumer-wait-score-next
             s_next = qk_next * config.qk_scale
+# @end
+
+# @ref flash3-consumer-online-next
             m_next = gl.maximum(m_i, gl.max(s_next, axis=1))
             p_next = gl.exp2(s_next - m_next[:, None])
 # @end

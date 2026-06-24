@@ -274,7 +274,7 @@ def _flash3_fwd_compute(config, channels, descs, M):
         mbarrier.arrive(k_empty)
 # @end
 
-# @ref flash3-cta-rowmax
+# @ref flash3-cta-score flash3-consumer-score-cur
         s_cur = qk_acc * config.qk_scale
 # @end
 
@@ -328,7 +328,7 @@ def _flash3_fwd_compute(config, channels, descs, M):
             mbarrier.arrive(k_empty)
 # @end
 
-# @ref flash3-consumer-online-next
+# @ref flash3-consumer-score-next flash3-consumer-wait-score-next
             s_next = qk_next * config.qk_scale
 # @end
 

@@ -1,4 +1,11 @@
-import type { CSSProperties, ReactNode } from 'react'
+import {
+  type ClipboardEvent,
+  type CSSProperties,
+  type KeyboardEvent,
+  type PointerEvent,
+  type ReactNode,
+  useRef,
+} from 'react'
 import type { AlgorithmBlock, AlgorithmLine, AttentionExample, LatexBlock, Segment } from '../model'
 import { CopyButton } from './CopyButton'
 
@@ -28,6 +35,82 @@ type AlgorithmRowProps = {
   selectedLineId: string | null
 }
 
+type PointerStart = {
+  x: number
+  y: number
+}
+
+function closestKatex(node: Node) {
+  const element = node instanceof Element ? node : node.parentElement
+
+  return element?.closest('.katex') ?? null
+}
+
+function replaceKatexMathWithTex(fragment: DocumentFragment) {
+  const renderedMath = fragment.querySelectorAll('.katex-mathml + .katex-html')
+
+  renderedMath.forEach((node) => node.remove())
+
+  const mathNodes = fragment.querySelectorAll('.katex-mathml')
+
+  mathNodes.forEach((node) => {
+    const texSource = node.querySelector('annotation')?.textContent
+
+    if (texSource) {
+      node.replaceWith(document.createTextNode(`$${texSource}$`))
+    }
+  })
+}
+
+function handleLatexSelectionCopy(event: ClipboardEvent<HTMLDivElement>) {
+  const selection = window.getSelection()
+
+  if (!selection || selection.isCollapsed || selection.rangeCount === 0 || !event.clipboardData) {
+    return
+  }
+
+  const { anchorNode, focusNode } = selection
+  const region = event.currentTarget
+
+  if (!anchorNode || !focusNode || !region.contains(anchorNode) || !region.contains(focusNode)) {
+    return
+  }
+
+  const range = selection.getRangeAt(0).cloneRange()
+  const startKatex = closestKatex(range.startContainer)
+  const endKatex = closestKatex(range.endContainer)
+
+  if (startKatex && region.contains(startKatex)) {
+    range.setStartBefore(startKatex)
+  }
+
+  if (endKatex && region.contains(endKatex)) {
+    range.setEndAfter(endKatex)
+  }
+
+  const fragment = range.cloneContents()
+
+  if (!fragment.querySelector('.katex-mathml')) {
+    return
+  }
+
+  const html = Array.from(fragment.childNodes)
+    .map((node) => (node instanceof Element ? node.outerHTML : node.textContent ?? ''))
+    .join('')
+
+  replaceKatexMathWithTex(fragment)
+
+  const plainText = fragment.textContent
+
+  if (!plainText) {
+    return
+  }
+
+  event.clipboardData.setData('text/html', html)
+  event.clipboardData.setData('text/plain', plainText)
+  event.preventDefault()
+}
+
 function AlgorithmRow({
   activeLineId,
   displayNumber,
@@ -40,22 +123,56 @@ function AlgorithmRow({
 }: AlgorithmRowProps) {
   const isActive = activeLineId === line.id
   const isSelected = selectedLineId === line.id
+  const pointerStart = useRef<PointerStart | null>(null)
+
+  function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.key !== 'Enter' && event.key !== ' ') {
+      return
+    }
+
+    event.preventDefault()
+    onActivate(line)
+  }
+
+  function handlePointerDown(event: PointerEvent<HTMLDivElement>) {
+    if (event.button !== 0) {
+      return
+    }
+
+    pointerStart.current = {
+      x: event.clientX,
+      y: event.clientY,
+    }
+  }
+
+  function handlePointerUp(event: PointerEvent<HTMLDivElement>) {
+    const start = pointerStart.current
+    pointerStart.current = null
+
+    if (!start || event.button !== 0) {
+      return
+    }
+
+    const pointerTravel = Math.hypot(event.clientX - start.x, event.clientY - start.y)
+
+    if (pointerTravel <= 4) {
+      onActivate(line)
+    }
+  }
 
   return (
-    <button
+    <div
       key={line.id}
-      type="button"
+      role="button"
+      tabIndex={0}
       className={`algorithm-row${isActive ? ' active' : ''}${isSelected ? ' selected' : ''}`}
       onBlur={onLeave}
-      onClick={(event) => {
-        if (event.detail === 0) {
-          onActivate(line)
-        }
-      }}
       onFocus={() => onFocus(line.id)}
+      onKeyDown={handleKeyDown}
       onMouseEnter={() => onFocus(line.id)}
       onMouseLeave={onLeave}
-      onPointerDown={() => onActivate(line)}
+      onPointerDown={handlePointerDown}
+      onPointerUp={handlePointerUp}
     >
       <span className="algorithm-row-number">{displayNumber ? `${displayNumber}:` : ''}</span>
       <span
@@ -64,7 +181,7 @@ function AlgorithmRow({
       >
         {line.parts.map(renderSegment)}
       </span>
-    </button>
+    </div>
   )
 }
 
@@ -99,7 +216,7 @@ export function AlgorithmPapers({
   }
 
   return (
-    <div className="region math-region">
+    <div className="region math-region" onCopy={handleLatexSelectionCopy}>
       <CopyButton copied={latexCopied} label="Copy LaTeX" onCopy={onCopyLatex} />
 
       {prelude?.map((part) => (

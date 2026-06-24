@@ -212,11 +212,11 @@
   }
 
   .example-nav button {
-    @apply relative min-h-[42px] cursor-pointer border-0 bg-transparent px-0 pt-0 pb-2.5 text-base font-extrabold tracking-normal text-muted transition-[transform,color,opacity] duration-150 ease-out;
+    @apply relative inline-flex min-h-[34px] cursor-pointer items-end border-0 bg-transparent px-0 pt-0 pb-1.5 text-base leading-none font-extrabold tracking-normal text-muted transition-[transform,color,opacity] duration-150 ease-out;
   }
 
   .example-nav button::after {
-    @apply absolute right-0 bottom-[-1px] left-0 h-[3px] bg-transparent transition-colors duration-150 ease-out content-[""];
+    @apply absolute right-0 bottom-0 left-0 h-[3px] bg-transparent transition-colors duration-150 ease-out content-[""];
   }
 
   .example-nav button:hover {
@@ -294,7 +294,7 @@
   }
 
   .algorithm-row {
-    @apply grid w-full cursor-pointer grid-cols-[30px_minmax(0,1fr)] rounded border border-transparent bg-transparent px-[3px] py-px text-left text-inherit transition-[background,border-color] duration-150 ease-out select-none;
+    @apply grid w-full cursor-pointer grid-cols-[30px_minmax(0,1fr)] rounded border border-transparent bg-transparent px-[3px] py-px text-left text-inherit transition-[background,border-color] duration-150 ease-out select-text;
     touch-action: manipulation;
   }
 
@@ -307,22 +307,27 @@
     @apply border-accent;
   }
 
+  .algorithm-row:focus-visible {
+    outline: 3px solid rgba(255, 176, 0, 0.82);
+    outline-offset: 3px;
+  }
+
   .algorithm-row-number {
-    @apply pr-2 text-right text-[0.88em] text-[#1f2926];
+    @apply cursor-pointer pr-2 text-right text-[0.88em] text-[#1f2926] select-none;
   }
 
   .algorithm-row-body {
-    @apply min-w-0;
+    @apply min-w-0 cursor-text select-text;
     padding-left: calc(var(--indent) * 20px);
     overflow-wrap: anywhere;
   }
 
   .algorithm-math {
-    @apply whitespace-normal;
+    @apply whitespace-normal select-text;
   }
 
   .algorithm-math .katex {
-    @apply text-[1em];
+    @apply text-[1em] select-text;
   }
 
   .code-region {
@@ -478,7 +483,7 @@
   }
 
   .example-nav button {
-    @apply min-h-[34px] px-[14px] py-0 text-[0.9rem];
+    @apply min-h-[30px] px-[14px] pt-0 pb-1.5 text-[0.9rem] leading-none;
   }
 
   .example-nav button.active {
