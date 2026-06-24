@@ -10,6 +10,7 @@ tmp/
 coverage/
 .vite/
 .codex/
+.noisy_room/
 
 # Environment files
 .env
