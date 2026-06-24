@@ -73,12 +73,12 @@ const flash4MmaRows: AlgorithmLineSpec[] = [
     strong('SM100 MMA replaces the older GEMM center. '),
     text('Compared with FA2 block matmuls and FA3 Hopper WGMMA, this sketch names Blackwell '),
     math(String.raw`tcgen05`),
-    text(' MMA atoms, operand major modes, warp-group ownership, and tensor-memory accumulator placement.'),
-  ], ['flash4-mma-atoms'], 1),
+    text(' MMA atoms, operand major modes, CuTe fragment ownership, warp-group ownership, and tensor-memory accumulator placement.'),
+  ], ['flash4-mma-atoms', 'flash4-forward-fragments'], 1),
   row('flash4-mma-operands', [
     strong('Forward is two explicit MMA products. '),
-    text('QK consumes shared-memory Q/K operands; PV consumes probabilities from tensor memory plus a transposed V operand laid out for MN-major access.'),
-  ], ['flash4-mma-operands', 'flash4-fp8-only-assert', 'flash4-fp8-mma-atoms'], 1),
+    text('QK consumes shared-memory Q/K operands; PV consumes probabilities from tensor memory plus a transposed V operand laid out for MN-major access. CuTe/CUTLASS helpers partition those operands into per-MMA views.'),
+  ], ['flash4-mma-operands', 'flash4-forward-fragments', 'flash4-fp8-only-assert', 'flash4-fp8-mma-atoms'], 1),
   row('flash4-mma-fp8-path', [
     strong('The code path is FP8-first. '),
     text('Q/K/V/O are checked as 8-bit operands, MMA atoms inherit FP8 element types, and the probability tile is cast back to FP8 before PV.'),
@@ -99,24 +99,28 @@ const flash4MmaRows: AlgorithmLineSpec[] = [
     strong('Softmax is the tensor-memory bridge. '),
     text('Softmax warps load '),
     math(String.raw`S`),
-    text(' from tensor memory, apply scale/mask/online normalization, and store FP8 probabilities back in the PV operand layout.'),
-  ], ['flash4-softmax-bridge'], 1),
+    text(' from tensor memory, apply scale/mask/online normalization, store FP8 probabilities for PV, and publish row sums/maxima through '),
+    math(String.raw`\mathrm{sScale}`),
+    text(' plus '),
+    math(String.raw`\mathrm{mbar\_softmax\_stats}`),
+    text(' for correction warps.'),
+  ], ['flash4-softmax-bridge', 'flash4-forward-stats-generic'], 1),
   row('flash4-mma-pv', [
     strong('PV MMA accumulates O in tensor memory. '),
     text('The second '),
     math(String.raw`cute.gemm`),
     text(' treats '),
     math(String.raw`P`),
-    text(' as the A operand from tensor memory and transposed V as the B operand from shared memory.'),
-  ], ['flash4-fwd-pv-mma', 'flash4-correction-bridge'], 1),
+    text(' as the A operand from tensor memory and transposed V as the B operand from shared memory; correction/epilogue then normalizes and drains O.'),
+  ], ['flash4-fwd-pv-mma', 'flash4-correction-bridge', 'flash4-forward-epilogue'], 1),
 
   row('flash4-mma-backward-label', [strong('MMA ops in backward')], [
     'flash4-bwd-mma-atoms',
   ]),
   row('flash4-bwd-contract', [
     strong('Backward is decomposed into MMA products. '),
-    text('Separate tiled MMA atoms rebuild scores, form dP, accumulate dK/dV, and accumulate dQ without materializing the full attention matrix.'),
-  ], ['flash4-bwd-mma-atoms'], 1),
+    text('Generic SM100 runs preprocess, a tiled-MMA main kernel, and dQ postprocess; the main kernel rebuilds scores, forms dP, accumulates dK/dV, and accumulates dQ without materializing the full attention matrix.'),
+  ], ['flash4-bwd-dispatch-generic', 'flash4-bwd-preprocess', 'flash4-bwd-mma-atoms', 'flash4-bwd-fragments', 'flash4-bwd-postprocess'], 1),
   row('flash4-bwd-recompute', [
     strong('Recompute scores on chip. '),
     text('A QK-style MMA rebuilds score tiles in the backward path, preserving the FlashAttention recompute strategy while moving the math to SM100 MMA atoms.'),
@@ -158,8 +162,8 @@ const flash4MmaRows: AlgorithmLineSpec[] = [
     strong('HD256 stages the head dimension explicitly. '),
     text('For the dedicated 2-CTA HD256 path, '),
     math(String.raw`\mathrm{iterations}_{QK}=2`),
-    text(' and the load warp issues matching Q/K and V slice handles. The compact HD128 branch is intentionally single-Q-stage, rather than the generic upstream two-M-stage pipeline.'),
-  ], ['flash4-q-stage-policy', 'flash4-q-staging-hd256', 'flash4-kv-staging-hd256'], 1),
+    text(' and the load warp issues matching Q/K and V slice handles. Generic SM100 may instead use q-stage as an M-stage pipeline, so the code marks where that source path diverges.'),
+  ], ['flash4-q-stage-policy', 'flash4-q-staging-hd256', 'flash4-kv-staging-hd256', 'flash4-forward-hd256-stats'], 1),
   row('flash4-2cta-pipeline-row', [
     strong('Cluster barriers define ownership. '),
     text('Producer/consumer barriers pass '),
@@ -182,30 +186,51 @@ const flash4MmaRows: AlgorithmLineSpec[] = [
   ], ['flash4-2cta-tmem', 'flash4-2cta-free'], 1),
 
   row('flash4-2cta-backward-label', [strong('2-CTA cluster backward pass')], [
+    'flash4-2cta-bwd-hd256-route',
     'flash4-2cta-bwd-traffic',
     'flash4-2cta-bwd-split-kernels',
+    'flash4-2cta-bwd-interface-args',
+    'flash4-2cta-bwd-launch-calls',
     'flash4-2cta-bwd-dq-store',
   ]),
+  row('flash4-2cta-bwd-hd256-route-row', [
+    strong('HD256 uses a dedicated SM100/SM110 route. '),
+    text('The interface recognizes '),
+    math(String.raw`\mathrm{head\_dim}=\mathrm{head\_dim}_V=256`),
+    text(' as a special shape, forces the 2-CTA path, and fixes the backward tile shapes to '),
+    math(String.raw`128{\times}128`),
+    text(' for dQ and '),
+    math(String.raw`128{\times}64`),
+    text(' for dK/dV.'),
+  ], ['flash4-2cta-bwd-hd256-route', 'flash4-2cta-bwd-split-kernels'], 1),
   row('flash4-2cta-bwd-traffic-row', [
     strong('Backward is shared-memory-bound. '),
     text('The FA4 paper notes that, even after TMEM staging, most backward GEMM operands still come from shared memory; 2-CTA MMA targets that bottleneck directly.'),
-  ], ['flash4-2cta-bwd-traffic', 'flash4-bwd-mma-atoms'], 1),
+  ], ['flash4-2cta-bwd-traffic', 'flash4-2cta-bwd-mma-atoms'], 1),
   row('flash4-2cta-bwd-operand-b-row', [
     strong('Operand-B traffic is cut by the CTA pair. '),
     text('With an M=256, N=K=128 MMA tile, the two CTAs behave as one larger tile: each CTA stages half of operand B and keeps its own accumulator slice.'),
-  ], ['flash4-2cta-bwd-traffic', 'flash4-bwd-mma-atoms'], 1),
+  ], ['flash4-2cta-bwd-traffic', 'flash4-2cta-bwd-mma-atoms'], 1),
   row('flash4-2cta-bwd-dq-reduction-row', [
     strong('dQ differs by implementation path. '),
     text('The paper/generic 2-CTA idea repacks dS through DSMEM for the query-side reduction. Current upstream HD256 code instead launches a dedicated dQ kernel and a separate dK/dV kernel.'),
-  ], ['flash4-2cta-bwd-dsmem', 'flash4-bwd-dq-mma', 'flash4-2cta-bwd-split-kernels'], 1),
+  ], ['flash4-2cta-bwd-dsmem', 'flash4-2cta-bwd-hd256-route', 'flash4-2cta-bwd-split-kernels', 'flash4-2cta-bwd-launch-calls'], 1),
   row('flash4-2cta-bwd-pipeline-row', [
     strong('The inner dQ pipeline still overlaps work. '),
     text('Inside the dedicated dQ kernel, dP and dQ MMA work are ordered to reuse tensor-memory space, but the HD256 wrapper is not one monolithic backward kernel.'),
-  ], ['flash4-2cta-bwd-pipeline', 'flash4-bwd-dsoftmax', 'flash4-bwd-dq-mma', 'flash4-2cta-bwd-split-kernels'], 1),
+  ], ['flash4-2cta-bwd-pipeline', 'flash4-2cta-bwd-dq-mainloop', 'flash4-2cta-bwd-split-kernels', 'flash4-2cta-bwd-launch-calls'], 1),
+  row('flash4-2cta-bwd-dq-kernel-row', [
+    strong('The dedicated dQ kernel owns its body. '),
+    text('It builds Q/K, dO/V, and dS/K fragment views, recomputes scores and dP, forms dS, accumulates dQ in tensor memory, then stores final dQ directly.'),
+  ], ['flash4-2cta-bwd-dq-kernel', 'flash4-2cta-bwd-dq-fragments', 'flash4-2cta-bwd-dq-mainloop', 'flash4-2cta-bwd-dq-store'], 1),
+  row('flash4-2cta-bwd-dkdv-kernel-row', [
+    strong('The dedicated dK/dV kernel is separate. '),
+    text('It builds K/Q, V/dO, dS/Q, and P/dO fragment views, accumulates dK and dV, and drains them through shared-memory epilogue buffers before TMA stores.'),
+  ], ['flash4-2cta-bwd-dkdv-kernel', 'flash4-2cta-bwd-dkdv-fragments', 'flash4-2cta-bwd-dkdv-mainloop', 'flash4-2cta-bwd-dkdv-store'], 1),
   row('flash4-2cta-bwd-dq-store-row', [
-    strong('Dedicated HD256 dQ is a direct store path. '),
-    text('The wrapper asserts that dQ/dK/dV semaphores are absent, treats the dQ_accum slot as the dQ output, launches dQ first, and lets the dQ epilogue store the result directly.'),
-  ], ['flash4-2cta-bwd-split-kernels', 'flash4-2cta-bwd-dq-store', 'flash4-bwd-epilogue'], 1),
+    strong('Dedicated HD256 writes dQ through its own epilogue. '),
+    text('Host dispatch passes final dQ through the historical dQ_accum ABI slot for HD256; the wrapper rejects generic semaphores, launches dQ before dK/dV, and skips the generic dQ postprocess route.'),
+  ], ['flash4-2cta-bwd-interface-args', 'flash4-2cta-bwd-launch-calls', 'flash4-2cta-bwd-dq-store'], 1),
 ]
 
 const flash4IdeaNotes: LatexBlockSpec[] = [
@@ -309,22 +334,28 @@ const flash4IdeaNotes: LatexBlockSpec[] = [
     id: 'flash4-scheduling-note',
     title: 'Scheduling',
     require: [
-      text('Code-pane sketch of static or CLC tile scheduling, causal/local longest-processing-time-first (LPT) block order, and variable-length Q sequence metadata.'),
+      text('Code-pane sketch of the three main upstream scheduling families: plain single-tile, LPT single-tile, and varlen single-tile. CLC, Cluster Launch Control, is a scheduling mode layered onto the LPT/varlen-style work fetch, not a separate coordinate family.'),
     ],
     rows: [
       row('flash4-schedule-select-row', [
-        strong('The sketch starts by choosing the tile scheduler. '),
+        strong('The sketch starts by choosing a scheduler family. '),
         text('Packed Q sequences use '),
         math(String.raw`\mathrm{SingleTileVarlenScheduler}`),
-        text('; causal, local, and CLC modes use '),
+        text('; causal/local ordering uses '),
         math(String.raw`\mathrm{SingleTileLPTScheduler}`),
-        text('; the dense nonpersistent case falls back to a plain single-tile scheduler.'),
+        text('; dense nonpersistent work falls back to a plain single-tile scheduler. CLC changes the work-fetch mode inside the capable schedulers.'),
       ], ['flash4-schedule-select'], 1),
+      row('flash4-schedule-clc-definition-row', [
+        strong('CLC means Cluster Launch Control. '),
+        text('Instead of assigning each CTA a fixed static tile id, CLC lets the kernel pull raw work from a hardware queue. The scheduler still converts that raw work into the same '),
+        math(String.raw`(M,H,B,\mathrm{split})`),
+        text(' coordinate shape consumed by the load, MMA, softmax, and correction loops.'),
+      ], ['flash4-schedule-args', 'flash4-schedule-clc-map'], 1),
       row('flash4-schedule-args-row', [
         strong('The scheduler receives the problem geometry. '),
         text('It is parameterized by M blocks, heads, batches, splits, K/V byte geometry, tile shape, cluster shape, and the '),
         math(String.raw`\mathrm{lpt}`),
-        text(' flag derived from causal or local masking.'),
+        text(' flag derived from causal or local masking; CLC is carried as a scheduling mode, not another LPT predicate.'),
       ], ['flash4-schedule-args'], 1),
       row('flash4-schedule-lpt-definition-row', [
         strong('LPT means longest-processing-time-first. '),
@@ -350,6 +381,14 @@ const flash4IdeaNotes: LatexBlockSpec[] = [
         strong('For variable lengths, the longest row is sequence-local. '),
         text('After the flat tile id has been decoded into a sequence, the scheduler picks a per-sequence head section size, then reverses inside that sequence\'s own M-block count.'),
       ], ['flash4-schedule-varlen-lpt'], 1),
+      row('flash4-schedule-clc-row', [
+        strong('CLC fetches raw work, then maps it. '),
+        text('Upstream CLC mode asks the hardware queue for a raw '),
+        math(String.raw`(\mathrm{block}, \mathrm{head}, \mathrm{batch/split})`),
+        text(' tile, then '),
+        math(String.raw`\mathrm{clc\_work\_to\_coords}`),
+        text(' applies cluster division, optional LPT reversal, split-KV unpacking, and cluster-lane expansion.'),
+      ], ['flash4-schedule-clc-map', 'flash4-schedule-clc-loop'], 1),
       row('flash4-schedule-work-loop-row', [
         strong('The work loop is per warp group. '),
         text('This page models the upstream shape: a scheduler object is passed into load, MMA, softmax, and correction warp groups, and each group runs its own '),
@@ -364,6 +403,7 @@ const flash4IdeaNotes: LatexBlockSpec[] = [
         'flash4-schedule-work-mma',
         'flash4-schedule-work-softmax',
         'flash4-schedule-work-correction',
+        'flash4-schedule-clc-map',
         'flash4-schedule-clc-loop',
       ], 1),
     ],
@@ -380,6 +420,7 @@ function withCausalRows(row: AlgorithmLineSpec): AlgorithmLineSpec {
           text('Softmax warps load '),
           math(String.raw`S`),
           text(' from tensor memory, apply the causal mask and base-2 online normalization, and store FP8 probabilities back in the PV operand layout.', 'mask'),
+          text(' Row sums/maxima still travel through the generic stats handoff.', 'mask'),
         ],
       },
       'flash4-fwd-causal-mask'
