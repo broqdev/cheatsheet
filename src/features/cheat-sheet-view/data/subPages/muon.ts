@@ -44,7 +44,7 @@ function withMoonshotLrRequire(require: typeof muonRequire) {
   return [
     ...require.slice(0, -1),
     text(', Moonshot LR adjustment ', 'moonshotLr'),
-    math(String.raw`\alpha_t=0.2\gamma\sqrt{\max(A,B)}`, 'moonshotLr'),
+    math(String.raw`\alpha_t=0.2\gamma\sqrt{\max(M,N)}`, 'moonshotLr'),
     text('.', 'moonshotLr'),
   ]
 }
@@ -62,7 +62,7 @@ const muonRows: AlgorithmLineSpec[] = [
       text('For each hidden matrix parameter '),
       math(String.raw`\theta_t`),
       text(' with '),
-      math(String.raw`\theta_t\in\mathbb{R}^{A\times B}`),
+      math(String.raw`\theta_t\in\mathbb{R}^{M\times N}`),
       text(' and gradient '),
       math(String.raw`g_t`),
       text('.'),
@@ -114,7 +114,7 @@ const muonRows: AlgorithmLineSpec[] = [
     number: 6,
     parts: [
       text('Adjust the learning rate for matrix shape '),
-      math(String.raw`\alpha_t=\gamma\sqrt{\max(1,A/B)}`),
+      math(String.raw`\alpha_t=\gamma\sqrt{\max(1,M/N)}`),
       text('.'),
     ],
     codeRefs: ['adjust-lr'],
@@ -154,7 +154,7 @@ const muonWeightDecayRows: AlgorithmLineSpec[] = [
       text('For each hidden matrix parameter '),
       math(String.raw`\theta_t`),
       text(' with '),
-      math(String.raw`\theta_t\in\mathbb{R}^{A\times B}`),
+      math(String.raw`\theta_t\in\mathbb{R}^{M\times N}`),
       text(' and gradient '),
       math(String.raw`g_t`),
       text('.'),
@@ -216,7 +216,7 @@ const muonWeightDecayRows: AlgorithmLineSpec[] = [
     number: 7,
     parts: [
       text('Adjust the learning rate for matrix shape '),
-      math(String.raw`\alpha_t=\gamma\sqrt{\max(1,A/B)}`),
+      math(String.raw`\alpha_t=\gamma\sqrt{\max(1,M/N)}`),
       text('.'),
     ],
     codeRefs: ['adjust-lr'],
@@ -253,7 +253,7 @@ function withMoonshotLrRows(rows: AlgorithmLineSpec[]) {
       ...row,
       parts: [
         text('Use Moonshot LR adjustment to match AdamW RMS ', 'moonshotLr'),
-        math(String.raw`\alpha_t=0.2\gamma\sqrt{\max(A,B)}`, 'moonshotLr'),
+        math(String.raw`\alpha_t=0.2\gamma\sqrt{\max(M,N)}`, 'moonshotLr'),
         text('.', 'moonshotLr'),
       ],
     }
@@ -389,7 +389,7 @@ const muonLearningRateNote: LatexBlockSpec = {
   title: 'Learning-rate shape scaling',
   require: [
     text('Matrix parameter '),
-    math(String.raw`\theta_t\in\mathbb{R}^{A\times B}`),
+    math(String.raw`\theta_t\in\mathbb{R}^{M\times N}`),
     text(', polar update '),
     math(String.raw`O_t`),
     text(', and base learning rate '),
@@ -402,9 +402,9 @@ const muonLearningRateNote: LatexBlockSpec = {
       number: 1,
       parts: [
         text('A full-rank polar update has '),
-        math(String.raw`\min(A,B)`),
+        math(String.raw`\min(M,N)`),
         text(' singular values equal to one, so its squared Frobenius norm is '),
-        math(String.raw`\lVert O_t\rVert_F^2=\min(A,B)`),
+        math(String.raw`\lVert O_t\rVert_F^2=\min(M,N)`),
         text('.'),
       ],
       codeRefs: ['orthogonalize'],
@@ -414,9 +414,9 @@ const muonLearningRateNote: LatexBlockSpec = {
       number: 2,
       parts: [
         text('RMS divides this energy over all '),
-        math(String.raw`AB`),
+        math(String.raw`MN`),
         text(' entries: '),
-        math(String.raw`\operatorname{RMS}(O_t)=\sqrt{\min(A,B)/(AB)}=1/\sqrt{\max(A,B)}`),
+        math(String.raw`\operatorname{RMS}(O_t)=\sqrt{\min(M,N)/(MN)}=1/\sqrt{\max(M,N)}`),
         text('.'),
       ],
       codeRefs: ['orthogonalize'],
@@ -425,7 +425,11 @@ const muonLearningRateNote: LatexBlockSpec = {
       id: 'muon-lr-why-needed',
       number: 3,
       parts: [
-        text('Without shape scaling, larger matrices receive smaller per-entry Muon updates; the LR factor compensates for this shape-dependent RMS.'),
+        text('Consider applying Muon to two matrices with different dimensions: the one with larger '),
+        math(String.raw`\max(M,N)`),
+        text(' has smaller '),
+        math(String.raw`\operatorname{RMS}(O_t)`),
+        text(', so it gets a smaller per-entry step unless the LR factor cancels this shape effect.'),
       ],
       codeRefs: ['adjust-lr'],
     },
@@ -434,13 +438,13 @@ const muonLearningRateNote: LatexBlockSpec = {
       number: 4,
       parts: [
         text('Keller original Muon uses '),
-        math(String.raw`\alpha_t=\gamma\sqrt{\max(1,A/B)}`),
+        math(String.raw`\alpha_t=\gamma\sqrt{\max(1,M/N)}`),
         text('. Multiplying by '),
         math(String.raw`\operatorname{RMS}(O_t)`),
         text(' gives roughly '),
-        math(String.raw`\gamma\sqrt{\max(1,A/B)}/\sqrt{\max(A,B)}=\gamma/\sqrt{B}`),
+        math(String.raw`\gamma\sqrt{\max(1,M/N)}/\sqrt{\max(M,N)}=\gamma/\sqrt{N}`),
         text(' when '),
-        math(String.raw`A\ge B`),
+        math(String.raw`M\ge N`),
         text(', so it is equivalent to Moonshot up to a global scale when matrices share the same second dimension.'),
       ],
       codeRefs: ['adjust-lr'],
@@ -450,9 +454,9 @@ const muonLearningRateNote: LatexBlockSpec = {
       number: 5,
       parts: [
         text('Moonshot RMS matching uses '),
-        math(String.raw`\alpha_t=0.2\gamma\sqrt{\max(A,B)}`),
+        math(String.raw`\alpha_t=0.2\gamma\sqrt{\max(M,N)}`),
         text('. The ratio cancels exactly: '),
-        math(String.raw`0.2\sqrt{\max(A,B)}\operatorname{RMS}(O_t)=0.2`),
+        math(String.raw`0.2\sqrt{\max(M,N)}\operatorname{RMS}(O_t)=0.2`),
         text(', close to the AdamW update RMS range reported in the paper before applying the base '),
         math(String.raw`\gamma`),
         text('.'),
@@ -464,7 +468,7 @@ const muonLearningRateNote: LatexBlockSpec = {
       number: 6,
       parts: [
         text('So the original rule is orientation-sensitive through '),
-        math(String.raw`B`),
+        math(String.raw`N`),
         text(', while Moonshot is shape-symmetric and targets consistent RMS across matrix shapes.'),
       ],
       codeRefs: ['adjust-lr'],
