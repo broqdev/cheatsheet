@@ -272,7 +272,7 @@ export function AlgorithmPapers({
             </p>
           ) : null}
           <div className="algorithm-lines">
-            {note.rows.map((line, rowIndex) => renderAlgorithmRow(line, rowIndex + 1))}
+            {note.rows.map((line) => renderAlgorithmRow(line))}
           </div>
         </article>
       ))}

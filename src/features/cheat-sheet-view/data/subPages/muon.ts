@@ -44,7 +44,7 @@ function withMoonshotLrRequire(require: typeof muonRequire) {
   return [
     ...require.slice(0, -1),
     text(', Moonshot LR adjustment ', 'moonshotLr'),
-    math(String.raw`\alpha_t=0.2\gamma\max(A,B)`, 'moonshotLr'),
+    math(String.raw`\alpha_t=0.2\gamma\sqrt{\max(A,B)}`, 'moonshotLr'),
     text('.', 'moonshotLr'),
   ]
 }
@@ -253,7 +253,7 @@ function withMoonshotLrRows(rows: AlgorithmLineSpec[]) {
       ...row,
       parts: [
         text('Use Moonshot LR adjustment to match AdamW RMS ', 'moonshotLr'),
-        math(String.raw`\alpha_t=0.2\gamma\max(A,B)`, 'moonshotLr'),
+        math(String.raw`\alpha_t=0.2\gamma\sqrt{\max(A,B)}`, 'moonshotLr'),
         text('.', 'moonshotLr'),
       ],
     }
@@ -262,7 +262,7 @@ function withMoonshotLrRows(rows: AlgorithmLineSpec[]) {
 
 const newtonSchulzNote: LatexBlockSpec = {
   id: 'muon-newton-schulz',
-  title: 'Newton-Schulz5 orthogonalization',
+  title: 'Newton-Schulz5 polar approximation',
   require: [
     text('Matrix update '),
     math(String.raw`U_t`),
@@ -270,6 +270,8 @@ const newtonSchulzNote: LatexBlockSpec = {
     math(String.raw`a=3.4445,b=-4.7750,c=2.0315`),
     text(', and iteration count '),
     math(String.raw`K`),
+    text('; for intuition, thin SVD '),
+    math(String.raw`X_i=Q_iS_iR_i^\top`),
     text('.'),
   ],
   rows: [
@@ -304,7 +306,7 @@ const newtonSchulzNote: LatexBlockSpec = {
       codeRefs: ['ns-cast', 'ns-normalize'],
     },
     {
-      id: 'muon-ns-iteration-explanation',
+      id: 'muon-ns-iteration',
       number: 4,
       parts: [
         text('Newton-Schulz5 uses the quintic matrix iteration '),
@@ -314,22 +316,64 @@ const newtonSchulzNote: LatexBlockSpec = {
       codeRefs: ['ns-coefficients', 'ns-iteration'],
     },
     {
-      id: 'muon-ns-iterate',
+      id: 'muon-ns-svd-decouples',
       number: 5,
       parts: [
-        text('Repeat '),
+        text('In SVD view, the update is a matrix polynomial in '),
         math(String.raw`A_i=X_iX_i^\top`),
-        text(', '),
-        math(String.raw`B_i=bA_i+cA_i^2`),
-        text(', and '),
-        math(String.raw`X_{i+1}=aX_i+B_iX_i`),
+        text('. Since '),
+        math(String.raw`A_i=Q_iS_i^2Q_i^\top`),
+        text(', the singular-vector directions stay aligned.'),
+      ],
+      codeRefs: ['ns-iteration'],
+    },
+    {
+      id: 'muon-ns-scalar-recurrence',
+      number: 6,
+      parts: [
+        text('Only the diagonal singular values move, each independently following '),
+        math(String.raw`s_{i+1}=as_i+bs_i^3+cs_i^5`),
         text('.'),
       ],
       codeRefs: ['ns-coefficients', 'ns-iteration'],
     },
     {
+      id: 'muon-ns-attracting-one',
+      number: 7,
+      parts: [
+        text('The target value is '),
+        math(String.raw`s=1`),
+        text(': small singular values are pushed upward, large ones are pushed downward, and repeated polar iterations move nonzero values toward one.'),
+      ],
+      codeRefs: ['ns-iteration'],
+    },
+    {
+      id: 'muon-ns-polar-result',
+      number: 8,
+      parts: [
+        text('When '),
+        math(String.raw`S_i`),
+        text(' is close to identity on the nonzero subspace, '),
+        math(String.raw`X_i=Q_iS_iR_i^\top`),
+        text(' is close to '),
+        math(String.raw`Q_iR_i^\top=\operatorname{polar}(X_i)`),
+        text(', the direction Muon wants to step along.'),
+      ],
+      codeRefs: ['ns-restore'],
+    },
+    {
+      id: 'muon-ns-five-step-approximation',
+      number: 9,
+      parts: [
+        text('Muon stops after five Newton-Schulz5 steps. It wants a fast, nearly polar update with singular values near '),
+        math(String.raw`1`),
+        text(', not an exact polar decomposition.'),
+      ],
+      codeRefs: ['ns-iteration'],
+    },
+    {
       id: 'muon-ns-return',
-      number: 6,
+      number: 10,
       parts: [
         text('Undo the transpose and return '),
         math(String.raw`X_K\approx\operatorname{polar}(U_t)`),
@@ -340,76 +384,95 @@ const newtonSchulzNote: LatexBlockSpec = {
   ],
 }
 
-const newtonSchulzSingularValueNote: LatexBlockSpec = {
-  id: 'muon-newton-schulz-singular-values',
-  title: 'Newton-Schulz5 singular-value dynamics',
-  requireLabel: 'Idea',
+const muonLearningRateNote: LatexBlockSpec = {
+  id: 'muon-learning-rate-shape-scaling',
+  title: 'Learning-rate shape scaling',
   require: [
-    text('Thin SVD '),
-    math(String.raw`X_i=Q_iS_iR_i^\top`),
-    text(', nonzero singular values '),
-    math(String.raw`s_i`),
-    text(', and polar target '),
-    math(String.raw`Q_iR_i^\top`),
+    text('Matrix parameter '),
+    math(String.raw`\theta_t\in\mathbb{R}^{A\times B}`),
+    text(', polar update '),
+    math(String.raw`O_t`),
+    text(', and base learning rate '),
+    math(String.raw`\gamma`),
     text('.'),
   ],
   rows: [
     {
-      id: 'muon-ns-svd-decouples',
+      id: 'muon-lr-frobenius-derivation',
       number: 1,
       parts: [
-        text('Because '),
-        math(String.raw`X_iX_i^\top=Q_iS_i^2Q_i^\top`),
-        text(', the Newton-Schulz5 update keeps the singular vectors aligned.'),
-      ],
-      codeRefs: ['ns-iteration'],
-    },
-    {
-      id: 'muon-ns-scalar-recurrence',
-      number: 2,
-      parts: [
-        text('Only the diagonal singular values change, each by the same scalar recurrence '),
-        math(String.raw`s_{i+1}=as_i+bs_i^3+cs_i^5`),
+        text('A full-rank polar update has '),
+        math(String.raw`\min(A,B)`),
+        text(' singular values equal to one, so its squared Frobenius norm is '),
+        math(String.raw`\lVert O_t\rVert_F^2=\min(A,B)`),
         text('.'),
       ],
-      codeRefs: ['ns-coefficients', 'ns-iteration'],
+      codeRefs: ['orthogonalize'],
     },
     {
-      id: 'muon-ns-attracting-one',
+      id: 'muon-lr-rms-derivation',
+      number: 2,
+      parts: [
+        text('RMS divides this energy over all '),
+        math(String.raw`AB`),
+        text(' entries: '),
+        math(String.raw`\operatorname{RMS}(O_t)=\sqrt{\min(A,B)/(AB)}=1/\sqrt{\max(A,B)}`),
+        text('.'),
+      ],
+      codeRefs: ['orthogonalize'],
+    },
+    {
+      id: 'muon-lr-why-needed',
       number: 3,
       parts: [
-        text('For an exact polar Newton-Schulz iteration, the scalar map has '),
-        math(String.raw`s=1`),
-        text(' as an attracting target: small singular values grow, oversized singular values shrink, and repeated steps move nonzero singular values toward one.'),
+        text('Without shape scaling, larger matrices receive smaller per-entry Muon updates; the LR factor compensates for this shape-dependent RMS.'),
       ],
-      codeRefs: ['ns-iteration'],
+      codeRefs: ['adjust-lr'],
     },
     {
-      id: 'muon-ns-polar-result',
+      id: 'muon-lr-keller-original',
       number: 4,
       parts: [
-        text('When the singular values approach one, '),
-        math(String.raw`X_i=Q_iS_iR_i^\top`),
-        text(' approaches '),
-        math(String.raw`Q_iR_i^\top=\operatorname{polar}(U_t)`),
-        text(', the polar factor used as the Muon update direction.'),
+        text('Keller original Muon uses '),
+        math(String.raw`\alpha_t=\gamma\sqrt{\max(1,A/B)}`),
+        text('. Multiplying by '),
+        math(String.raw`\operatorname{RMS}(O_t)`),
+        text(' gives roughly '),
+        math(String.raw`\gamma\sqrt{\max(1,A/B)}/\sqrt{\max(A,B)}=\gamma/\sqrt{B}`),
+        text(' when '),
+        math(String.raw`A\ge B`),
+        text(', so it is equivalent to Moonshot up to a global scale when matrices share the same second dimension.'),
       ],
-      codeRefs: ['ns-restore'],
+      codeRefs: ['adjust-lr'],
     },
     {
-      id: 'muon-ns-five-step-approximation',
+      id: 'muon-lr-moonshot-rms',
       number: 5,
       parts: [
-        text('Muon uses five Newton-Schulz5 steps as a fast polar approximation, pushing singular values toward an order-one band near '),
-        math(String.raw`1`),
-        text(' rather than solving the exact polar factor.'),
+        text('Moonshot RMS matching uses '),
+        math(String.raw`\alpha_t=0.2\gamma\sqrt{\max(A,B)}`),
+        text('. The ratio cancels exactly: '),
+        math(String.raw`0.2\sqrt{\max(A,B)}\operatorname{RMS}(O_t)=0.2`),
+        text(', close to the AdamW update RMS range reported in the paper before applying the base '),
+        math(String.raw`\gamma`),
+        text('.'),
       ],
-      codeRefs: ['ns-iteration'],
+      codeRefs: ['adjust-lr'],
+    },
+    {
+      id: 'muon-lr-difference',
+      number: 6,
+      parts: [
+        text('So the original rule is orientation-sensitive through '),
+        math(String.raw`B`),
+        text(', while Moonshot is shape-symmetric and targets consistent RMS across matrix shapes.'),
+      ],
+      codeRefs: ['adjust-lr'],
     },
   ],
 }
 
-const muonNotes = [newtonSchulzNote, newtonSchulzSingularValueNote]
+const muonNotes = [newtonSchulzNote, muonLearningRateNote]
 
 const muonContent = defineAttentionContent({
   rawCode: muonCode,

@@ -99,6 +99,83 @@ type ToggleQueryState = {
   weightDecayEnabled: boolean
   moonshotLrEnabled: boolean
   momentumEnabled: boolean
+  nesterovEnabled: boolean
+}
+
+const toggleQueryKeys = {
+  attentionMaskEnabled: ['mask'],
+  dropoutEnabled: ['dropout'],
+  fp8Enabled: ['fp8'],
+  weightDecayEnabled: ['weightDecay', 'wd'],
+  moonshotLrEnabled: ['moonshotLr', 'moonshot', 'mslr'],
+  momentumEnabled: ['momentum', 'mom'],
+  nesterovEnabled: ['nesterov', 'nag'],
+} satisfies Record<keyof ToggleQueryState, string[]>
+
+const canonicalToggleQueryKeys = {
+  attentionMaskEnabled: 'mask',
+  dropoutEnabled: 'dropout',
+  fp8Enabled: 'fp8',
+  weightDecayEnabled: 'weightDecay',
+  moonshotLrEnabled: 'moonshotLr',
+  momentumEnabled: 'momentum',
+  nesterovEnabled: 'nesterov',
+} satisfies Record<keyof ToggleQueryState, string>
+
+const toggleStateKeys = Object.keys(toggleQueryKeys) as Array<keyof ToggleQueryState>
+const knownToggleQueryKeys = Object.values(toggleQueryKeys).flat()
+const toggleStorageKeyPrefix = 'broq-cheatsheet:toggle-state:'
+
+function emptyToggleState(): ToggleQueryState {
+  return {
+    attentionMaskEnabled: false,
+    dropoutEnabled: false,
+    fp8Enabled: false,
+    weightDecayEnabled: false,
+    moonshotLrEnabled: false,
+    momentumEnabled: false,
+    nesterovEnabled: false,
+  }
+}
+
+function toggleStateFromUnknown(value: unknown): ToggleQueryState {
+  if (!value || typeof value !== 'object') {
+    return emptyToggleState()
+  }
+
+  const record = value as Partial<Record<keyof ToggleQueryState, unknown>>
+
+  return {
+    attentionMaskEnabled: record.attentionMaskEnabled === true,
+    dropoutEnabled: record.dropoutEnabled === true,
+    fp8Enabled: record.fp8Enabled === true,
+    weightDecayEnabled: record.weightDecayEnabled === true,
+    moonshotLrEnabled: record.moonshotLrEnabled === true,
+    momentumEnabled: record.momentumEnabled === true,
+    nesterovEnabled: record.nesterovEnabled === true,
+  }
+}
+
+function storageKeyForExample(example: AttentionExample) {
+  return `${toggleStorageKeyPrefix}${example.id}`
+}
+
+function storedToggleStateForExample(example: AttentionExample): ToggleQueryState {
+  try {
+    const rawState = window.localStorage.getItem(storageKeyForExample(example))
+
+    return rawState ? toggleStateFromUnknown(JSON.parse(rawState)) : emptyToggleState()
+  } catch {
+    return emptyToggleState()
+  }
+}
+
+function storeToggleStateForExample(example: AttentionExample, toggleState: ToggleQueryState) {
+  try {
+    window.localStorage.setItem(storageKeyForExample(example), JSON.stringify(toggleState))
+  } catch {
+    // Ignore storage failures so private browsing or quota issues do not break controls.
+  }
 }
 
 function queryToggleEnabled(params: URLSearchParams, key: string) {
@@ -107,21 +184,42 @@ function queryToggleEnabled(params: URLSearchParams, key: string) {
   return ['1', 'true', 'yes', 'on'].includes(value ?? '')
 }
 
-function toggleStateFromSearch(search: string): ToggleQueryState {
+function queryToggleValue(params: URLSearchParams, stateKey: keyof ToggleQueryState) {
+  for (const key of toggleQueryKeys[stateKey]) {
+    if (params.has(key)) {
+      return queryToggleEnabled(params, key)
+    }
+  }
+
+  return undefined
+}
+
+function searchHasToggleQuery(search: string) {
   const params = new URLSearchParams(search)
 
+  return knownToggleQueryKeys.some((key) => params.has(key))
+}
+
+function toggleStateFromSearch(
+  search: string,
+  fallbackState: ToggleQueryState = emptyToggleState()
+): ToggleQueryState {
+  const params = new URLSearchParams(search)
+  const baseState = searchHasToggleQuery(search) ? emptyToggleState() : fallbackState
+
   return {
-    attentionMaskEnabled: queryToggleEnabled(params, 'mask'),
-    dropoutEnabled: queryToggleEnabled(params, 'dropout'),
-    fp8Enabled: queryToggleEnabled(params, 'fp8'),
+    attentionMaskEnabled:
+      queryToggleValue(params, 'attentionMaskEnabled') ?? baseState.attentionMaskEnabled,
+    dropoutEnabled: queryToggleValue(params, 'dropoutEnabled') ?? baseState.dropoutEnabled,
+    fp8Enabled: queryToggleValue(params, 'fp8Enabled') ?? baseState.fp8Enabled,
     weightDecayEnabled:
-      queryToggleEnabled(params, 'weightDecay') || queryToggleEnabled(params, 'wd'),
+      queryToggleValue(params, 'weightDecayEnabled') ?? baseState.weightDecayEnabled,
     moonshotLrEnabled:
-      queryToggleEnabled(params, 'moonshotLr') ||
-      queryToggleEnabled(params, 'moonshot') ||
-      queryToggleEnabled(params, 'mslr'),
+      queryToggleValue(params, 'moonshotLrEnabled') ?? baseState.moonshotLrEnabled,
     momentumEnabled:
-      queryToggleEnabled(params, 'momentum') || queryToggleEnabled(params, 'mom'),
+      queryToggleValue(params, 'momentumEnabled') ?? baseState.momentumEnabled,
+    nesterovEnabled:
+      queryToggleValue(params, 'nesterovEnabled') ?? baseState.nesterovEnabled,
   }
 }
 
@@ -136,6 +234,10 @@ function hasAttentionMaskToggle(example: AttentionExample) {
 function availableToggleState(example: AttentionExample, toggleState: ToggleQueryState) {
   const attentionMaskEnabled = hasAttentionMaskToggle(example) && toggleState.attentionMaskEnabled
   const attentionMode = attentionModeForState({ ...toggleState, attentionMaskEnabled })
+  const momentumAvailable = Boolean(example.momentumContent?.[attentionMode])
+  const nesterovAvailable = Boolean(example.nesterovContent?.[attentionMode])
+  const nesterovEnabled = toggleState.nesterovEnabled && nesterovAvailable
+  const momentumEnabled = (toggleState.momentumEnabled || nesterovEnabled) && momentumAvailable
 
   return {
     attentionMaskEnabled,
@@ -153,15 +255,54 @@ function availableToggleState(example: AttentionExample, toggleState: ToggleQuer
     moonshotLrEnabled:
       toggleState.moonshotLrEnabled &&
       Boolean(example.moonshotLrContent?.[attentionMode]),
-    momentumEnabled:
-      toggleState.momentumEnabled &&
-      Boolean(example.momentumContent?.[attentionMode]),
+    momentumEnabled,
+    nesterovEnabled: nesterovEnabled && momentumEnabled,
   }
+}
+
+function availableToggleKeys(example: AttentionExample, toggleState: ToggleQueryState) {
+  const attentionMaskEnabled = hasAttentionMaskToggle(example) && toggleState.attentionMaskEnabled
+  const attentionMode = attentionModeForState({ ...toggleState, attentionMaskEnabled })
+  const availableKeys = new Set<keyof ToggleQueryState>()
+
+  if (hasAttentionMaskToggle(example)) {
+    availableKeys.add('attentionMaskEnabled')
+  }
+
+  if (example.id === 'flash1' && example.dropoutContent?.[attentionMode]) {
+    availableKeys.add('dropoutEnabled')
+  }
+
+  if (example.id === 'flash3' && example.fp8Content?.[attentionMode]) {
+    availableKeys.add('fp8Enabled')
+  }
+
+  if (example.weightDecayContent?.[attentionMode]) {
+    availableKeys.add('weightDecayEnabled')
+  }
+
+  if (example.moonshotLrContent?.[attentionMode]) {
+    availableKeys.add('moonshotLrEnabled')
+  }
+
+  if (example.momentumContent?.[attentionMode]) {
+    availableKeys.add('momentumEnabled')
+  }
+
+  if (example.nesterovContent?.[attentionMode]) {
+    availableKeys.add('nesterovEnabled')
+  }
+
+  return availableKeys
 }
 
 function viewStateFromLocation() {
   const example = exampleFromLocation()
-  const toggleState = availableToggleState(example, toggleStateFromSearch(window.location.search))
+  const storedToggleState = storedToggleStateForExample(example)
+  const toggleState = availableToggleState(
+    example,
+    toggleStateFromSearch(window.location.search, storedToggleState)
+  )
 
   return { example, toggleState }
 }
@@ -169,45 +310,22 @@ function viewStateFromLocation() {
 function searchForToggleState(example: AttentionExample, toggleState: ToggleQueryState) {
   const params = new URLSearchParams(window.location.search)
   const availableState = availableToggleState(example, toggleState)
+  const availableKeys = availableToggleKeys(example, toggleState)
 
-  for (const key of [
-    'sync',
-    'mask',
-    'dropout',
-    'fp8',
-    'weightDecay',
-    'wd',
-    'moonshotLr',
-    'moonshot',
-    'mslr',
-    'momentum',
-    'mom',
-  ]) {
-    params.delete(key)
+  for (const stateKey of toggleStateKeys) {
+    if (!availableKeys.has(stateKey)) {
+      continue
+    }
+
+    for (const key of toggleQueryKeys[stateKey]) {
+      params.delete(key)
+    }
   }
 
-  if (availableState.attentionMaskEnabled) {
-    params.set('mask', 'on')
-  }
-
-  if (availableState.dropoutEnabled) {
-    params.set('dropout', 'on')
-  }
-
-  if (availableState.fp8Enabled) {
-    params.set('fp8', 'on')
-  }
-
-  if (availableState.weightDecayEnabled) {
-    params.set('weightDecay', 'on')
-  }
-
-  if (availableState.moonshotLrEnabled) {
-    params.set('moonshotLr', 'on')
-  }
-
-  if (availableState.momentumEnabled) {
-    params.set('momentum', 'on')
+  for (const stateKey of toggleStateKeys) {
+    if (availableKeys.has(stateKey) && availableState[stateKey]) {
+      params.set(canonicalToggleQueryKeys[stateKey], 'on')
+    }
   }
 
   const nextSearch = params.toString()
@@ -239,6 +357,9 @@ function CheatSheetViewPage() {
   const [momentumEnabled, setMomentumEnabled] = useState(
     () => viewStateFromLocation().toggleState.momentumEnabled
   )
+  const [nesterovEnabled, setNesterovEnabled] = useState(
+    () => viewStateFromLocation().toggleState.nesterovEnabled
+  )
   const [copiedTarget, setCopiedTarget] = useState<CopyTarget | null>(null)
   const codeRegionRef = useRef<HTMLDivElement>(null)
 
@@ -252,40 +373,37 @@ function CheatSheetViewPage() {
     activeExample.moonshotLrWeightDecayContent?.[attentionMode]
   const momentumContent = activeExample.momentumContent?.[attentionMode]
   const momentumWeightDecayContent = activeExample.momentumWeightDecayContent?.[attentionMode]
+  const nesterovContent = activeExample.nesterovContent?.[attentionMode]
+  const nesterovWeightDecayContent =
+    activeExample.nesterovWeightDecayContent?.[attentionMode]
   const attentionMaskAvailable = hasAttentionMaskToggle(activeExample)
   const dropoutAvailable = activeExample.id === 'flash1' && Boolean(dropoutContent)
   const fp8Available = activeExample.id === 'flash3' && Boolean(fp8Content)
   const weightDecayAvailable = Boolean(weightDecayContent)
   const moonshotLrAvailable = Boolean(moonshotLrContent)
   const momentumAvailable = Boolean(momentumContent)
+  const nesterovAvailable = Boolean(nesterovContent)
+  const canUseWeightDecay = weightDecayEnabled && weightDecayAvailable
+  const canUseMoonshotLr = moonshotLrEnabled && moonshotLrAvailable
+  const canUseMomentum = momentumEnabled && momentumAvailable
+  const canUseNesterov = nesterovEnabled && nesterovAvailable && canUseMomentum
   const activeGroupExamples = useMemo(
     () => examplesForExampleGroup(activeExample.id),
     [activeExample.id]
   )
   const activeContent =
-    momentumEnabled &&
-    momentumAvailable &&
-    weightDecayEnabled &&
-    weightDecayAvailable &&
-    momentumWeightDecayContent
-      ? momentumWeightDecayContent
-      : moonshotLrEnabled &&
-        moonshotLrAvailable &&
-        weightDecayEnabled &&
-        weightDecayAvailable &&
-        moonshotLrWeightDecayContent
-      ? moonshotLrWeightDecayContent
-      : fp8Enabled && fp8Available && fp8Content
-      ? fp8Content
-      : dropoutEnabled && dropoutAvailable && dropoutContent
-      ? dropoutContent
-      : momentumEnabled && momentumAvailable && momentumContent
-      ? momentumContent
-      : moonshotLrEnabled && moonshotLrAvailable && moonshotLrContent
-      ? moonshotLrContent
-      : weightDecayEnabled && weightDecayAvailable && weightDecayContent
-      ? weightDecayContent
-      : activeExample.content[attentionMode]
+    [
+      { active: canUseNesterov && canUseWeightDecay, content: nesterovWeightDecayContent },
+      { active: canUseNesterov, content: nesterovContent },
+      { active: canUseMomentum && canUseWeightDecay, content: momentumWeightDecayContent },
+      { active: canUseMoonshotLr && canUseWeightDecay, content: moonshotLrWeightDecayContent },
+      { active: fp8Enabled && fp8Available, content: fp8Content },
+      { active: dropoutEnabled && dropoutAvailable, content: dropoutContent },
+      { active: canUseMomentum, content: momentumContent },
+      { active: canUseMoonshotLr, content: moonshotLrContent },
+      { active: canUseWeightDecay, content: weightDecayContent },
+    ].find((variant) => variant.active && variant.content)?.content ??
+    activeExample.content[attentionMode]
   const activeLineId = selectedLineId ?? hoveredLineId
   const selectableRows = [
     ...(activeContent.prelude?.flatMap((note) => note.rows) ?? []),
@@ -345,6 +463,7 @@ function CheatSheetViewPage() {
       weightDecayEnabled,
       moonshotLrEnabled,
       momentumEnabled,
+      nesterovEnabled,
     }
   }
 
@@ -355,9 +474,11 @@ function CheatSheetViewPage() {
     setWeightDecayEnabled(toggleState.weightDecayEnabled)
     setMoonshotLrEnabled(toggleState.moonshotLrEnabled)
     setMomentumEnabled(toggleState.momentumEnabled)
+    setNesterovEnabled(toggleState.nesterovEnabled)
   }
 
   function replaceUrlForToggleState(example: AttentionExample, toggleState: ToggleQueryState) {
+    storeToggleStateForExample(example, toggleState)
     window.history.replaceState(
       null,
       '',
@@ -377,7 +498,10 @@ function CheatSheetViewPage() {
       return
     }
 
-    const nextToggleState = availableToggleState(nextExample, currentToggleState())
+    const nextToggleState = availableToggleState(
+      nextExample,
+      storedToggleStateForExample(nextExample)
+    )
 
     setActiveExampleId(nextExample.id)
     applyToggleState(nextToggleState)
@@ -479,6 +603,23 @@ function CheatSheetViewPage() {
     const nextToggleState = availableToggleState(activeExample, {
       ...currentToggleState(),
       momentumEnabled: enabled,
+      nesterovEnabled: enabled ? nesterovEnabled : false,
+    })
+
+    applyToggleState(nextToggleState)
+    resetExampleState()
+    replaceUrlForToggleState(activeExample, nextToggleState)
+  }
+
+  function toggleNesterov(enabled: boolean) {
+    if (enabled && !nesterovAvailable) {
+      return
+    }
+
+    const nextToggleState = availableToggleState(activeExample, {
+      ...currentToggleState(),
+      momentumEnabled: enabled ? true : momentumEnabled,
+      nesterovEnabled: enabled,
     })
 
     applyToggleState(nextToggleState)
@@ -636,12 +777,15 @@ function CheatSheetViewPage() {
         moonshotLrEnabled={moonshotLrEnabled}
         momentumAvailable={momentumAvailable}
         momentumEnabled={momentumEnabled}
+        nesterovAvailable={nesterovAvailable}
+        nesterovEnabled={nesterovEnabled}
         onToggleDropout={toggleDropout}
         onToggleFp8={toggleFp8}
         onToggleAttentionMask={toggleAttentionMask}
         onToggleWeightDecay={toggleWeightDecay}
         onToggleMoonshotLr={toggleMoonshotLr}
         onToggleMomentum={toggleMomentum}
+        onToggleNesterov={toggleNesterov}
       />
 
       <ExampleTabs

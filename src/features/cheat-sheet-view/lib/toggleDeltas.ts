@@ -6,6 +6,7 @@ export const toggleDeltaColors = {
   fp8: '#006d8f',
   weightDecay: '#047857',
   momentum: '#b45309',
+  nesterov: '#c026d3',
   moonshotLr: '#2563eb',
 } satisfies Record<ToggleDelta, string>
 

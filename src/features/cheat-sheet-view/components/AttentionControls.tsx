@@ -16,12 +16,15 @@ type AttentionControlsProps = {
   moonshotLrEnabled: boolean
   momentumAvailable: boolean
   momentumEnabled: boolean
+  nesterovAvailable: boolean
+  nesterovEnabled: boolean
   onToggleDropout: (enabled: boolean) => void
   onToggleFp8: (enabled: boolean) => void
   onToggleAttentionMask: (enabled: boolean) => void
   onToggleWeightDecay: (enabled: boolean) => void
   onToggleMoonshotLr: (enabled: boolean) => void
   onToggleMomentum: (enabled: boolean) => void
+  onToggleNesterov: (enabled: boolean) => void
 }
 
 function ToggleLabel({ children, delta }: { children: ReactNode; delta: ToggleDelta }) {
@@ -51,25 +54,30 @@ export function AttentionControls({
   moonshotLrEnabled,
   momentumAvailable,
   momentumEnabled,
+  nesterovAvailable,
+  nesterovEnabled,
   onToggleDropout,
   onToggleFp8,
   onToggleAttentionMask,
   onToggleWeightDecay,
   onToggleMoonshotLr,
   onToggleMomentum,
+  onToggleNesterov,
 }: AttentionControlsProps) {
   const dropoutActive = dropoutAvailable && dropoutEnabled
   const fp8Active = fp8Available && fp8Enabled
   const weightDecayActive = weightDecayAvailable && weightDecayEnabled
   const moonshotLrActive = moonshotLrAvailable && moonshotLrEnabled
   const momentumActive = momentumAvailable && momentumEnabled
+  const nesterovActive = nesterovAvailable && nesterovEnabled
   const hasControls =
     attentionMaskAvailable ||
     dropoutAvailable ||
     fp8Available ||
     weightDecayAvailable ||
     moonshotLrAvailable ||
-    momentumAvailable
+    momentumAvailable ||
+    nesterovAvailable
 
   if (!hasControls) {
     return (
@@ -135,6 +143,17 @@ export function AttentionControls({
             onChange={(event) => onToggleMomentum(event.currentTarget.checked)}
           />
           <ToggleLabel delta="momentum">Momentum</ToggleLabel>
+        </label>
+      ) : null}
+
+      {nesterovAvailable ? (
+        <label className={`checkbox-control${nesterovActive ? ' active' : ''}`}>
+          <input
+            type="checkbox"
+            checked={nesterovActive}
+            onChange={(event) => onToggleNesterov(event.currentTarget.checked)}
+          />
+          <ToggleLabel delta="nesterov">Nesterov</ToggleLabel>
         </label>
       ) : null}
 

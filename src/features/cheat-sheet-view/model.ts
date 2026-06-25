@@ -4,6 +4,7 @@ export type ToggleDelta =
   | 'fp8'
   | 'weightDecay'
   | 'momentum'
+  | 'nesterov'
   | 'moonshotLr'
 
 export type Segment =
@@ -51,6 +52,8 @@ export type AttentionExample = {
   moonshotLrWeightDecayContent?: Partial<Record<AttentionMode, AttentionContent>>
   momentumContent?: Partial<Record<AttentionMode, AttentionContent>>
   momentumWeightDecayContent?: Partial<Record<AttentionMode, AttentionContent>>
+  nesterovContent?: Partial<Record<AttentionMode, AttentionContent>>
+  nesterovWeightDecayContent?: Partial<Record<AttentionMode, AttentionContent>>
 }
 
 export type CatalogItem = {

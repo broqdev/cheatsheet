@@ -66,7 +66,7 @@ def muon_step(params, grads, state, lr, momentum=0.95, ns_steps=5):
             update = zeropower_via_newtonschulz5(update, steps=ns_steps)
 # @end
 # @ref adjust-lr
-            adjusted_lr = 0.2 * lr * max(param.size(0), param.size(1))
+            adjusted_lr = 0.2 * lr * max(param.size(0), param.size(1)) ** 0.5
 # @end
 # @ref update
             param.add_(update, alpha=-adjusted_lr)

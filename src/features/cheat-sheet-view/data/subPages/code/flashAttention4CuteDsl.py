@@ -35,12 +35,14 @@ LOG2_E = 1.4426950408889634
 LN2 = 0.6931471805599453
 SM100_TMEM_COLUMNS = 512
 FP8_DTYPE = cutlass.Float8E4M3FN
+# @ref flash4-ex2-poly-coefficients
 POLY_EX2_DEGREE_3 = (
     Float32(1.0),
     Float32(0.6951461434364319),
     Float32(0.22756439447402954),
     Float32(0.07711908966302872),
 )
+# @end
 
 
 @cute.jit
@@ -452,9 +454,14 @@ class FlashAttention4Sm100CuteDsl:
         self.qk_acc_stage = 2
         self.mma_corr_stage = 2
 # @ref flash4-skip-rescale-threshold
-        # FP8 SM100 uses a positive threshold so nearly identical row maxima do
-        # not force a full output-accumulator rescale on every K tile.
-        self.rescale_threshold = 4.0
+        # FP8 SM100 keeps this at zero: stale row maxima plus the FP8 max_offset
+        # can overflow E4M3 probabilities, so every max increase must rescale O.
+        self.rescale_threshold = 0.0
+# @end
+# @ref flash4-fp8-max-offset
+        # The FP8 probability tile is stored with a positive exponent offset and
+        # compensated in row_sum / LSE, matching the upstream FP8 softmax path.
+        self.fp8_max_offset = Float32(8.0)
 # @end
         self.cta_tiler = (m_block_size, n_block_size, head_dim)
         self.qk_mma_tiler = (2 * m_block_size, n_block_size, min(head_dim, 128))
@@ -1140,7 +1147,7 @@ class FlashAttention4Sm100CuteDsl:
                         correction = Float32(1.0)
 # @end
 # @ref flash4-softmax-bridge flash4-exp2-apply flash4-skip-rescale-apply
-                probs = scores_log2 - row_max_candidate
+                probs = scores_log2 - row_max_candidate + self.fp8_max_offset
                 probs_converted = cute.make_rmem_tensor(probs.shape, self.q_dtype)
                 # apply_exp2_convert mutates probs from log2 residuals into
                 # probabilities, then stores the FP8 version for PV MMA.
@@ -1277,7 +1284,10 @@ class FlashAttention4Sm100CuteDsl:
         final_scale = self.load_v_descale(descale_tensors) / row_sum
         self.store_o_tile_from_tmem(o, tOtO, final_scale)
         if const_expr(lse is not None):
-            self.store_lse_row(lse, row_max * LN2 + cute.math.log(row_sum))
+            self.store_lse_row(
+                lse,
+                row_max * LN2 + cute.math.log(row_sum) - self.fp8_max_offset * LN2,
+            )
 # @end
 
     @cute.jit
