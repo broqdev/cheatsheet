@@ -32,10 +32,10 @@ def adam_step(params, grads, state, lr, beta1=0.9, beta2=0.999, eps=1e-8, weight
                 d_p = d_p.add(param, alpha=weight_decay)
 # @end
 # @ref first-moment
-            exp_avg.mul_(beta1).add_(d_p, alpha=1.0 - beta1)
+            exp_avg.lerp_(d_p, 1.0 - beta1)
 # @end
 # @ref second-moment
-            exp_avg_sq.mul_(beta2).addcmul_(d_p, d_p, value=1.0 - beta2)
+            exp_avg_sq.lerp_(d_p.square(), 1.0 - beta2)
 # @end
 # @ref bias-correction
             bias_correction1 = 1.0 - beta1**step

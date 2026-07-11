@@ -19,7 +19,7 @@ function rmspropRequire({ momentum, weightDecay }: RmspropVariant) {
     math(String.raw`g_t=\nabla_{\theta}L_t(\theta_t)`),
     text(', learning rate '),
     math(String.raw`\gamma`),
-    text(', square-average coefficient '),
+    text(', second-moment coefficient '),
     math(String.raw`\alpha`),
     text(', numerical constant '),
     math(String.raw`\epsilon`),
@@ -70,9 +70,9 @@ function rmspropRows({ momentum, weightDecay }: RmspropVariant): AlgorithmLineSp
     row({
       id: 'rmsprop-state-init',
       parts: [
-        text('Initialize running square average '),
+        text('Initialize second-moment state '),
         math(String.raw`v_{t-1}`),
-        text('; if centered, initialize gradient average '),
+        text('; if centered, initialize first-moment state '),
         math(String.raw`\bar{g}_{t-1}`),
         ...(momentum
           ? [
@@ -106,7 +106,7 @@ function rmspropRows({ momentum, weightDecay }: RmspropVariant): AlgorithmLineSp
         parts: [
           text('Add coupled L2 weight decay ', 'weightDecay'),
           math(String.raw`d_t \leftarrow d_t+\lambda\theta_t`, 'weightDecay'),
-          text(' before square averaging.', 'weightDecay'),
+          text(' before moment updates.', 'weightDecay'),
         ],
         codeRefs: ['weight-decay'],
       })
@@ -115,19 +115,10 @@ function rmspropRows({ momentum, weightDecay }: RmspropVariant): AlgorithmLineSp
 
   rows.push(
     row({
-      id: 'rmsprop-square-computation',
-      parts: [
-        text('Compute the elementwise square '),
-        math(String.raw`q_t=d_t\odot d_t`),
-        text('.'),
-      ],
-      codeRefs: ['square-average'],
-    }),
-    row({
       id: 'rmsprop-square-average',
       parts: [
-        text('Update running square average '),
-        math(String.raw`v_t=\alpha v_{t-1}+(1-\alpha)q_t`),
+        text('Update second moment '),
+        math(String.raw`v_t=\alpha v_{t-1}+(1-\alpha)d_t\odot d_t`),
         text('.'),
       ],
       codeRefs: ['square-average'],
@@ -135,7 +126,7 @@ function rmspropRows({ momentum, weightDecay }: RmspropVariant): AlgorithmLineSp
     row({
       id: 'rmsprop-centered',
       parts: [
-        text('If centered, update '),
+        text('If centered, update first moment '),
         math(String.raw`\bar{g}_t=\alpha\bar{g}_{t-1}+(1-\alpha)d_t`),
         text(' and use '),
         math(String.raw`\tilde{v}_t=v_t-\bar{g}_t\odot\bar{g}_t`),
@@ -144,15 +135,6 @@ function rmspropRows({ momentum, weightDecay }: RmspropVariant): AlgorithmLineSp
         text('.'),
       ],
       codeRefs: ['centered-average'],
-    }),
-    row({
-      id: 'rmsprop-denominator',
-      parts: [
-        text('Compute RMS denominator '),
-        math(String.raw`r_t=\sqrt{\tilde{v}_t}+\epsilon`),
-        text('.'),
-      ],
-      codeRefs: ['denominator'],
     })
   )
 
@@ -162,10 +144,10 @@ function rmspropRows({ momentum, weightDecay }: RmspropVariant): AlgorithmLineSp
         id: 'rmsprop-momentum',
         parts: [
           text('Update momentum buffer ', 'momentum'),
-          math(String.raw`b_t=\mu b_{t-1}+d_t/r_t`, 'momentum'),
+          math(String.raw`b_t=\mu b_{t-1}+d_t/(\sqrt{\tilde{v}_t}+\epsilon)`, 'momentum'),
           text('.', 'momentum'),
         ],
-        codeRefs: ['momentum'],
+        codeRefs: ['denominator', 'momentum'],
       }),
       row({
         id: 'rmsprop-update',
@@ -183,10 +165,10 @@ function rmspropRows({ momentum, weightDecay }: RmspropVariant): AlgorithmLineSp
         id: 'rmsprop-update',
         parts: [
           text('Apply the normalized update '),
-          math(String.raw`\theta_{t+1}=\theta_t-\gamma d_t/r_t`),
+          math(String.raw`\theta_{t+1}=\theta_t-\gamma d_t/(\sqrt{\tilde{v}_t}+\epsilon)`),
           text('.'),
         ],
-        codeRefs: ['update'],
+        codeRefs: ['denominator', 'update'],
       })
     )
   }
