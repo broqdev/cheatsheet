@@ -5,7 +5,7 @@ import sgdMomentumNesterovCode from './code/sgdMomentumNesterov.py?raw'
 import sgdMomentumWeightDecayCode from './code/sgdMomentumWeightDecay.py?raw'
 import sgdMomentumWeightDecayNesterovCode from './code/sgdMomentumWeightDecayNesterov.py?raw'
 import sgdWeightDecayCode from './code/sgdWeightDecay.py?raw'
-import { defineAttentionContent, type AlgorithmLineSpec, type LatexBlockSpec } from '../../lib/codeRefs'
+import { defineAttentionContent, type AlgorithmLineSpec, type LatexBlockSpec } from '../../lib/contentCompiler'
 import { math, strong, text } from '../../lib/segments'
 
 type SgdVariant = {
@@ -62,6 +62,7 @@ function sgdRows({ momentum, nesterov, weightDecay }: SgdVariant): AlgorithmLine
   const rows: AlgorithmLineSpec[] = [
     {
       id: 'sgd-forward-label',
+      startsBlock: { id: 'sgd-forward', role: 'forward' },
       parts: [strong('Optimization step.')],
       codeRefs: ['step-signature', 'no-grad'],
     },
@@ -309,24 +310,32 @@ export const sgdExample: AttentionExample = {
     unmasked: sgdContent,
     masked: sgdContent,
   },
-  weightDecayContent: {
-    unmasked: sgdWeightDecayContent,
-    masked: sgdWeightDecayContent,
-  },
-  momentumContent: {
-    unmasked: sgdMomentumContent,
-    masked: sgdMomentumContent,
-  },
-  momentumWeightDecayContent: {
-    unmasked: sgdMomentumWeightDecayContent,
-    masked: sgdMomentumWeightDecayContent,
-  },
-  nesterovContent: {
-    unmasked: sgdNesterovContent,
-    masked: sgdNesterovContent,
-  },
-  nesterovWeightDecayContent: {
-    unmasked: sgdNesterovWeightDecayContent,
-    masked: sgdNesterovWeightDecayContent,
-  },
+  variants: [
+    {
+      enabled: ['weightDecay'],
+      content: { unmasked: sgdWeightDecayContent, masked: sgdWeightDecayContent },
+    },
+    {
+      enabled: ['momentum'],
+      content: { unmasked: sgdMomentumContent, masked: sgdMomentumContent },
+    },
+    {
+      enabled: ['momentum', 'weightDecay'],
+      content: {
+        unmasked: sgdMomentumWeightDecayContent,
+        masked: sgdMomentumWeightDecayContent,
+      },
+    },
+    {
+      enabled: ['momentum', 'nesterov'],
+      content: { unmasked: sgdNesterovContent, masked: sgdNesterovContent },
+    },
+    {
+      enabled: ['momentum', 'nesterov', 'weightDecay'],
+      content: {
+        unmasked: sgdNesterovWeightDecayContent,
+        masked: sgdNesterovWeightDecayContent,
+      },
+    },
+  ],
 }

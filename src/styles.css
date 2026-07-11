@@ -162,11 +162,11 @@
   }
 
   .example-nav {
-    @apply flex min-h-[50px] w-full flex-[0_0_50px] items-end gap-[14px] overflow-hidden px-0.5;
+    @apply flex min-h-[50px] w-full flex-[0_0_50px] items-start gap-[14px] overflow-hidden px-0.5;
   }
 
   .example-nav-track {
-    @apply flex min-h-[49px] min-w-0 flex-[1_1_auto] items-end gap-[22px] overflow-x-auto overflow-y-hidden bg-transparent px-px whitespace-nowrap;
+    @apply flex min-h-[49px] min-w-0 flex-[1_1_auto] items-start gap-[22px] overflow-x-auto overflow-y-hidden bg-transparent px-px whitespace-nowrap;
     scrollbar-width: none;
   }
 
@@ -263,13 +263,26 @@
     @apply block shrink-0;
   }
 
+  .region-copy-button-label {
+    @apply pointer-events-none absolute top-1/2 right-[calc(100%+6px)] flex h-7 items-center whitespace-nowrap rounded-[6px] border border-[rgba(0,127,112,0.38)] bg-white px-2.5 text-xs leading-none font-extrabold text-accent shadow-[2px_2px_0_rgba(0,127,112,0.1)];
+    animation: copy-confirmation-in 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
   .math-region .region-copy-button {
-    --copy-shift-x: 16px;
-    @apply top-[-14px] justify-self-end mr-[-14px];
+    --copy-shift-x: 0px;
+    @apply absolute top-3 right-[22px] z-[4] h-9 w-9 min-w-9 mt-0 mr-0 mb-0 ml-0;
+  }
+
+  .math-region .region-copy-button--confirmed {
+    @apply border-[rgba(0,127,112,0.56)] text-accent;
+  }
+
+  .math-region > .algorithm-paper:first-of-type .algorithm-header {
+    @apply pr-[116px];
   }
 
   .math-region {
-    @apply grid content-start gap-[18px] overflow-x-hidden overflow-y-auto border-r border-line bg-[rgba(255,255,255,0.78)] px-[22px] py-5 backdrop-blur-md;
+    @apply grid content-start gap-[18px] overflow-x-hidden overflow-y-auto border-r border-line bg-[rgba(255,255,255,0.78)] px-[22px] pt-3 pb-5 backdrop-blur-md;
   }
 
   .algorithm-paper {
@@ -412,9 +425,26 @@
   }
 }
 
+@keyframes copy-confirmation-in {
+  from {
+    opacity: 0;
+    transform: translate(6px, -50%) scale(0.96);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate(0, -50%) scale(1);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .main-panel {
     animation: none;
+  }
+
+  .region-copy-button-label {
+    animation: none;
+    transform: translateY(-50%);
   }
 
   *,
@@ -501,7 +531,11 @@
   }
 
   .math-region {
-    @apply p-[18px];
+    @apply px-[18px] pt-3 pb-[18px];
+  }
+
+  .math-region .region-copy-button {
+    @apply right-[18px];
   }
 
   .katex {

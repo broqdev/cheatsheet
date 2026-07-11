@@ -3,9 +3,9 @@ import flashAttentionCode from './code/flashAttention1.py?raw'
 import maskedFlashAttentionCode from './code/maskedFlashAttention1.py?raw'
 import flashAttentionDropoutCode from './code/flashAttention1Dropout.py?raw'
 import maskedFlashAttentionDropoutCode from './code/maskedFlashAttention1Dropout.py?raw'
-import { defineAttentionContent, type AlgorithmLineSpec, type LatexBlockSpec } from '../../lib/codeRefs'
+import { defineAttentionContent, type AlgorithmLineSpec, type LatexBlockSpec } from '../../lib/contentCompiler'
 import { math, strong, text } from '../../lib/segments'
-import { latexDelta } from '../../lib/toggleDeltas'
+import { latexDelta } from '../../lib/equationPresentation'
 
 const flashCostNotes: LatexBlockSpec[] = [
   {
@@ -210,6 +210,34 @@ const maskedFlashDropoutRequire = [
   math(String.raw`p_{\mathrm{drop}}`, 'dropout'),
   text('.'),
 ]
+
+function flashBackwardRequire(masked: boolean, dropout: boolean) {
+  return [
+    text('Matrices '),
+    math(String.raw`Q,K,V,O,dO \in \mathbb{R}^{N \times d}`),
+    text(' in HBM, vectors '),
+    math(String.raw`\ell,m\in\mathbb{R}^{N}`),
+    text(' in HBM, on-chip SRAM of size '),
+    math(String.raw`M`),
+    text(', QK scaling factor '),
+    math(String.raw`\alpha\in\mathbb{R}`),
+    text(' (usually '),
+    math(String.raw`\alpha=1/\sqrt{d}`),
+    text(')'),
+    ...(masked
+      ? [text(', masking function ', 'mask'), math(String.raw`\operatorname{MASK}`, 'mask')]
+      : []),
+    ...(dropout
+      ? [
+          text(', dropout probability ', 'dropout'),
+          math(String.raw`p_{\mathrm{drop}}`, 'dropout'),
+          text(', pseudo-random number generator state ', 'dropout'),
+          math(String.raw`\mathcal{R}`, 'dropout'),
+          text(' from the forward pass.', 'dropout'),
+        ]
+      : [text('.')]),
+  ]
+}
 
 const flashDropoutRows: AlgorithmLineSpec[] = [
   {
@@ -431,6 +459,7 @@ const flashDropoutRows: AlgorithmLineSpec[] = [
   },
   {
     id: 'flash-bwd-label',
+    startsBlock: { id: 'flash-bwd', role: 'backward' },
     parts: [text('Backward pass')],
     codeRefs: ['bwd-signature'],
   },
@@ -851,28 +880,37 @@ export const flashAttention1Example: AttentionExample = {
     unmasked: defineAttentionContent({
       rawCode: flashAttentionCode,
       require: flashRequire,
+      blockRequires: { backward: flashBackwardRequire(false, false) },
       rows: flashRows,
       notes: flashCostNotes,
     }),
     masked: defineAttentionContent({
       rawCode: maskedFlashAttentionCode,
       require: maskedFlashRequire,
+      blockRequires: { backward: flashBackwardRequire(true, false) },
       rows: maskedFlashRows,
       notes: flashCostNotes,
     }),
   },
-  dropoutContent: {
-    unmasked: defineAttentionContent({
-      rawCode: flashAttentionDropoutCode,
-      require: flashDropoutRequire,
-      rows: flashDropoutUnmaskedRows,
-      notes: flashCostNotes,
-    }),
-    masked: defineAttentionContent({
-      rawCode: maskedFlashAttentionDropoutCode,
-      require: maskedFlashDropoutRequire,
-      rows: flashDropoutRows,
-      notes: flashCostNotes,
-    }),
-  },
+  variants: [
+    {
+      enabled: ['dropout'],
+      content: {
+        unmasked: defineAttentionContent({
+          rawCode: flashAttentionDropoutCode,
+          require: flashDropoutRequire,
+          blockRequires: { backward: flashBackwardRequire(false, true) },
+          rows: flashDropoutUnmaskedRows,
+          notes: flashCostNotes,
+        }),
+        masked: defineAttentionContent({
+          rawCode: maskedFlashAttentionDropoutCode,
+          require: maskedFlashDropoutRequire,
+          blockRequires: { backward: flashBackwardRequire(true, true) },
+          rows: flashDropoutRows,
+          notes: flashCostNotes,
+        }),
+      },
+    },
+  ],
 }

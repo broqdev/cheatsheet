@@ -1,4 +1,11 @@
-import type { AlgorithmLine, AttentionContent, LatexBlock } from '../model'
+import type {
+  AlgorithmBlock,
+  AlgorithmBlockRole,
+  AlgorithmLine,
+  AttentionContent,
+  LatexBlock,
+  Segment,
+} from '../model'
 
 export type AlgorithmLineSpec = Omit<AlgorithmLine, 'codeLines'> & {
   codeRefs?: string[]
@@ -9,7 +16,10 @@ export type LatexBlockSpec = Omit<LatexBlock, 'rows'> & {
   rows: AlgorithmLineSpec[]
 }
 
-export type AttentionContentSpec = Omit<AttentionContent, 'code' | 'rows' | 'prelude' | 'notes'> & {
+export type AttentionContentSpec = Omit<
+  AttentionContent,
+  'blocks' | 'code' | 'rows' | 'prelude' | 'notes'
+> & {
   rawCode: string
   rows: AlgorithmLineSpec[]
   prelude?: LatexBlockSpec[]
@@ -72,10 +82,7 @@ function parseCodeRefs(rawCode: string): ParsedCodeRefs {
 
     if (activeRefs) {
       const lineNumber = codeLines.length
-
-      for (const ref of activeRefs) {
-        appendLine(refIndex, ref, lineNumber)
-      }
+      activeRefs.forEach((ref) => appendLine(refIndex, ref, lineNumber))
     }
   }
 
@@ -83,10 +90,7 @@ function parseCodeRefs(rawCode: string): ParsedCodeRefs {
     throw new Error(`Unclosed code ref block "${activeRefs.join(' ')}".`)
   }
 
-  return {
-    code: codeLines.join('\n'),
-    refIndex,
-  }
+  return { code: codeLines.join('\n'), refIndex }
 }
 
 function uniqueLines(lines: number[]) {
@@ -109,20 +113,22 @@ function resolveLine(
     return lines
   })
 
+  const { codeRefs: _codeRefs, ...resolvedLine } = line
+
   return {
-    ...line,
+    ...resolvedLine,
     codeLines: uniqueLines([...(line.codeLines ?? []), ...refLines]),
   }
 }
 
-function resolveNote(
-  note: LatexBlockSpec,
+function resolveBlock(
+  block: LatexBlockSpec,
   refIndex: Map<string, number[]>,
   usedRefs: Set<string>
 ): LatexBlock {
   return {
-    ...note,
-    rows: note.rows.map((line) => resolveLine(line, refIndex, usedRefs)),
+    ...block,
+    rows: block.rows.map((line) => resolveLine(line, refIndex, usedRefs)),
   }
 }
 
@@ -145,16 +151,87 @@ export function defineAttentionContent(spec: AttentionContentSpec): AttentionCon
   const parsedCode = parseCodeRefs(spec.rawCode)
   const usedRefs = new Set<string>()
   const rows = spec.rows.map((line) => resolveLine(line, parsedCode.refIndex, usedRefs))
-  const prelude = spec.prelude?.map((note) => resolveNote(note, parsedCode.refIndex, usedRefs))
-  const notes = spec.notes?.map((note) => resolveNote(note, parsedCode.refIndex, usedRefs))
+  const prelude = spec.prelude?.map((block) =>
+    resolveBlock(block, parsedCode.refIndex, usedRefs)
+  )
+  const notes = spec.notes?.map((block) => resolveBlock(block, parsedCode.refIndex, usedRefs))
 
   warnUnusedRefs(parsedCode.refIndex, usedRefs, spec.ignoredUnusedRefs)
 
-  return {
+  const content = {
     code: parsedCode.code,
     require: spec.require,
+    blockRequires: spec.blockRequires,
     rows,
     prelude,
     notes,
   }
+
+  return {
+    ...content,
+    blocks: compileAlgorithmBlocks(content),
+  }
+}
+
+function labelFromParts(parts: Segment[]) {
+  return parts
+    .map((part) => part.value)
+    .join('')
+    .replace(/\.$/, '')
+}
+
+type CompilableContent = Pick<AttentionContent, 'blockRequires' | 'require' | 'rows'> & {
+  blocks?: AlgorithmBlock[]
+}
+
+function blockRequire(content: CompilableContent, role: AlgorithmBlockRole) {
+  if (role === 'forward') {
+    return content.blockRequires?.forward ?? content.require
+  }
+
+  const requirement = content.blockRequires?.[role]
+
+  if (!requirement) {
+    throw new Error(`Missing ${role} requirement for an explicit ${role} algorithm block.`)
+  }
+
+  return requirement
+}
+
+export function compileAlgorithmBlocks(content: CompilableContent): AlgorithmBlock[] {
+  if (content.blocks) {
+    return content.blocks
+  }
+
+  const blocks: AlgorithmBlock[] = [
+    {
+      id: 'forward',
+      title: 'Forward pass',
+      require: blockRequire(content, 'forward'),
+      rows: [],
+    },
+  ]
+
+  for (const row of content.rows) {
+    if (row.startsBlock) {
+      const currentBlock = blocks[blocks.length - 1]
+      const nextBlock = {
+        id: row.startsBlock.id,
+        title: labelFromParts(row.parts),
+        require: blockRequire(content, row.startsBlock.role),
+        rows: [],
+      }
+
+      if (blocks.length === 1 && currentBlock.rows.length === 0) {
+        blocks[0] = nextBlock
+      } else {
+        blocks.push(nextBlock)
+      }
+      continue
+    }
+
+    blocks[blocks.length - 1].rows.push(row)
+  }
+
+  return blocks.filter((block) => block.rows.length > 0)
 }

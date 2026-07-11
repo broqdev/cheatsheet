@@ -3,7 +3,7 @@ import rmspropCode from './code/rmsprop.py?raw'
 import rmspropMomentumCode from './code/rmspropMomentum.py?raw'
 import rmspropMomentumWeightDecayCode from './code/rmspropMomentumWeightDecay.py?raw'
 import rmspropWeightDecayCode from './code/rmspropWeightDecay.py?raw'
-import { defineAttentionContent, type AlgorithmLineSpec } from '../../lib/codeRefs'
+import { defineAttentionContent, type AlgorithmLineSpec } from '../../lib/contentCompiler'
 import { math, strong, text } from '../../lib/segments'
 
 type RmspropVariant = {
@@ -53,6 +53,7 @@ function rmspropRows({ momentum, weightDecay }: RmspropVariant): AlgorithmLineSp
   const rows: AlgorithmLineSpec[] = [
     {
       id: 'rmsprop-forward-label',
+      startsBlock: { id: 'rmsprop-forward', role: 'forward' },
       parts: [strong('Optimization step.')],
       codeRefs: ['step-signature', 'no-grad'],
     },
@@ -219,16 +220,21 @@ export const rmspropExample: AttentionExample = {
     unmasked: rmspropContent,
     masked: rmspropContent,
   },
-  weightDecayContent: {
-    unmasked: rmspropWeightDecayContent,
-    masked: rmspropWeightDecayContent,
-  },
-  momentumContent: {
-    unmasked: rmspropMomentumContent,
-    masked: rmspropMomentumContent,
-  },
-  momentumWeightDecayContent: {
-    unmasked: rmspropMomentumWeightDecayContent,
-    masked: rmspropMomentumWeightDecayContent,
-  },
+  variants: [
+    {
+      enabled: ['weightDecay'],
+      content: { unmasked: rmspropWeightDecayContent, masked: rmspropWeightDecayContent },
+    },
+    {
+      enabled: ['momentum'],
+      content: { unmasked: rmspropMomentumContent, masked: rmspropMomentumContent },
+    },
+    {
+      enabled: ['momentum', 'weightDecay'],
+      content: {
+        unmasked: rmspropMomentumWeightDecayContent,
+        masked: rmspropMomentumWeightDecayContent,
+      },
+    },
+  ],
 }

@@ -1,7 +1,7 @@
 import type { AttentionExample } from '../../model'
 import adamWCode from './code/adamw.py?raw'
 import adamWWeightDecayCode from './code/adamwWeightDecay.py?raw'
-import { defineAttentionContent, type AlgorithmLineSpec } from '../../lib/codeRefs'
+import { defineAttentionContent, type AlgorithmLineSpec } from '../../lib/contentCompiler'
 import { math, strong, text } from '../../lib/segments'
 
 const adamWRequire = [
@@ -41,6 +41,7 @@ const adamWWeightDecayRequire = [
 const adamWRows: AlgorithmLineSpec[] = [
   {
     id: 'adamw-forward-label',
+    startsBlock: { id: 'adamw-forward', role: 'forward' },
     parts: [strong('Optimization step with no decay.')],
     codeRefs: ['step-signature', 'no-grad'],
   },
@@ -137,6 +138,7 @@ const adamWRows: AlgorithmLineSpec[] = [
 const adamWWeightDecayRows: AlgorithmLineSpec[] = [
   {
     id: 'adamw-forward-label',
+    startsBlock: { id: 'adamw-forward', role: 'forward' },
     parts: [strong('Optimization step with decoupled decay.')],
     codeRefs: ['step-signature', 'no-grad'],
   },
@@ -263,8 +265,10 @@ export const adamWExample: AttentionExample = {
     unmasked: adamWContent,
     masked: adamWContent,
   },
-  weightDecayContent: {
-    unmasked: adamWWeightDecayContent,
-    masked: adamWWeightDecayContent,
-  },
+  variants: [
+    {
+      enabled: ['weightDecay'],
+      content: { unmasked: adamWWeightDecayContent, masked: adamWWeightDecayContent },
+    },
+  ],
 }

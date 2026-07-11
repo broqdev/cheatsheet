@@ -1,7 +1,7 @@
 import type { AttentionExample } from '../../model'
 import flashAttention2Code from './code/flashAttention2.py?raw'
 import causalFlashAttention2Code from './code/causalFlashAttention2.py?raw'
-import { defineAttentionContent, type AlgorithmLineSpec, type LatexBlockSpec } from '../../lib/codeRefs'
+import { defineAttentionContent, type AlgorithmLineSpec, type LatexBlockSpec } from '../../lib/contentCompiler'
 import { math, strong, text } from '../../lib/segments'
 
 const flash2CostNotes: LatexBlockSpec[] = [
@@ -139,9 +139,30 @@ const causalFlash2Require = [
   text(').'),
 ]
 
+function flash2BackwardRequire(causal: boolean) {
+  return [
+    text('Matrices '),
+    math(String.raw`Q,K,V,O,dO \in \mathbb{R}^{N \times d}`),
+    text(' in HBM, vector '),
+    math(String.raw`L\in\mathbb{R}^{N}`),
+    text(' in HBM, workspace '),
+    math(String.raw`D\in\mathbb{R}^{N}`),
+    text(' in HBM, on-chip SRAM of size '),
+    math(String.raw`M`),
+    text(', QK scaling factor '),
+    math(String.raw`\alpha\in\mathbb{R}`),
+    text(' (usually '),
+    math(String.raw`\alpha=1/\sqrt{d}`),
+    text(')'),
+    ...(causal ? [text(', causal attention enabled', 'mask')] : []),
+    text('.'),
+  ]
+}
+
 const flash2Rows: AlgorithmLineSpec[] = [
   {
     id: 'flash2-forward-label',
+    startsBlock: { id: 'flash2-forward', role: 'forward' },
     parts: [strong('Forward pass')],
     codeRefs: ['flash2-forward-label'],
   },
@@ -370,6 +391,7 @@ const flash2Rows: AlgorithmLineSpec[] = [
   },
   {
     id: 'flash2-bwd-label',
+    startsBlock: { id: 'flash2-bwd', role: 'backward' },
     parts: [strong('Backward pass')],
     codeRefs: ['flash2-bwd-label'],
   },
@@ -628,6 +650,7 @@ const flash2Rows: AlgorithmLineSpec[] = [
 const causalFlash2Rows: AlgorithmLineSpec[] = [
   {
     id: 'flash2-forward-label',
+    startsBlock: { id: 'flash2-forward', role: 'forward' },
     parts: [strong('Forward pass')],
     codeRefs: ['flash2-forward-label'],
   },
@@ -912,6 +935,7 @@ const causalFlash2Rows: AlgorithmLineSpec[] = [
   },
   {
     id: 'flash2-bwd-label',
+    startsBlock: { id: 'flash2-bwd', role: 'backward' },
     parts: [strong('Backward pass')],
     codeRefs: ['flash2-bwd-label'],
   },
@@ -1190,16 +1214,19 @@ export const flashAttention2Example: AttentionExample = {
   label: 'FlashAttention-2',
   description: 'FlashAttention-2 keeps exact tiled attention while improving parallelism, work partitioning, and non-matmul overhead.',
   algorithmTitle: 'FlashAttention-2',
+  variantLabels: { mask: 'Causal Attention' },
   content: {
     unmasked: defineAttentionContent({
       rawCode: flashAttention2Code,
       require: flash2Require,
+      blockRequires: { backward: flash2BackwardRequire(false) },
       rows: flash2Rows,
       notes: flash2CostNotes,
     }),
     masked: defineAttentionContent({
       rawCode: causalFlashAttention2Code,
       require: causalFlash2Require,
+      blockRequires: { backward: flash2BackwardRequire(true) },
       rows: causalFlash2Rows,
       notes: causalFlash2CostNotes,
     }),

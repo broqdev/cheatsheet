@@ -3,11 +3,12 @@ import {
   type CSSProperties,
   type KeyboardEvent,
   type PointerEvent,
-  type ReactNode,
   useRef,
 } from 'react'
-import type { AlgorithmBlock, AlgorithmLine, AttentionExample, LatexBlock, Segment } from '../model'
+import { clipboardContentsForLatexSelection } from '../lib/equationPresentation'
+import type { AlgorithmBlock, AlgorithmLine, AttentionExample, LatexBlock } from '../model'
 import { CopyButton } from './CopyButton'
+import { EquationSegment } from './EquationSegment'
 
 type AlgorithmPapersProps = {
   activeExample: AttentionExample
@@ -20,7 +21,6 @@ type AlgorithmPapersProps = {
   onLineActivate: (line: AlgorithmLine) => void
   onLineFocus: (lineId: string) => void
   onLineLeave: () => void
-  renderSegment: (segment: Segment, index: number) => ReactNode
   selectedLineId: string | null
 }
 
@@ -31,7 +31,6 @@ type AlgorithmRowProps = {
   onActivate: (line: AlgorithmLine) => void
   onFocus: (lineId: string) => void
   onLeave: () => void
-  renderSegment: (segment: Segment, index: number) => ReactNode
   selectedLineId: string | null
 }
 
@@ -40,74 +39,21 @@ type PointerStart = {
   y: number
 }
 
-function closestKatex(node: Node) {
-  const element = node instanceof Element ? node : node.parentElement
-
-  return element?.closest('.katex') ?? null
-}
-
-function replaceKatexMathWithTex(fragment: DocumentFragment) {
-  const renderedMath = fragment.querySelectorAll('.katex-mathml + .katex-html')
-
-  renderedMath.forEach((node) => node.remove())
-
-  const mathNodes = fragment.querySelectorAll('.katex-mathml')
-
-  mathNodes.forEach((node) => {
-    const texSource = node.querySelector('annotation')?.textContent
-
-    if (texSource) {
-      node.replaceWith(document.createTextNode(`$${texSource}$`))
-    }
-  })
-}
-
 function handleLatexSelectionCopy(event: ClipboardEvent<HTMLDivElement>) {
   const selection = window.getSelection()
 
-  if (!selection || selection.isCollapsed || selection.rangeCount === 0 || !event.clipboardData) {
+  if (!selection || !event.clipboardData) {
     return
   }
 
-  const { anchorNode, focusNode } = selection
-  const region = event.currentTarget
+  const contents = clipboardContentsForLatexSelection(event.currentTarget, selection)
 
-  if (!anchorNode || !focusNode || !region.contains(anchorNode) || !region.contains(focusNode)) {
+  if (!contents) {
     return
   }
 
-  const range = selection.getRangeAt(0).cloneRange()
-  const startKatex = closestKatex(range.startContainer)
-  const endKatex = closestKatex(range.endContainer)
-
-  if (startKatex && region.contains(startKatex)) {
-    range.setStartBefore(startKatex)
-  }
-
-  if (endKatex && region.contains(endKatex)) {
-    range.setEndAfter(endKatex)
-  }
-
-  const fragment = range.cloneContents()
-
-  if (!fragment.querySelector('.katex-mathml')) {
-    return
-  }
-
-  const html = Array.from(fragment.childNodes)
-    .map((node) => (node instanceof Element ? node.outerHTML : node.textContent ?? ''))
-    .join('')
-
-  replaceKatexMathWithTex(fragment)
-
-  const plainText = fragment.textContent
-
-  if (!plainText) {
-    return
-  }
-
-  event.clipboardData.setData('text/html', html)
-  event.clipboardData.setData('text/plain', plainText)
+  event.clipboardData.setData('text/html', contents.html)
+  event.clipboardData.setData('text/plain', contents.plainText)
   event.preventDefault()
 }
 
@@ -118,7 +64,6 @@ function AlgorithmRow({
   onActivate,
   onFocus,
   onLeave,
-  renderSegment,
   selectedLineId,
 }: AlgorithmRowProps) {
   const isActive = activeLineId === line.id
@@ -179,7 +124,9 @@ function AlgorithmRow({
         className="algorithm-row-body"
         style={{ '--indent': line.indent ?? 0 } as CSSProperties}
       >
-        {line.parts.map(renderSegment)}
+        {line.parts.map((segment, index) => (
+          <EquationSegment key={index} segment={segment} />
+        ))}
       </span>
     </div>
   )
@@ -196,9 +143,14 @@ export function AlgorithmPapers({
   onLineActivate,
   onLineFocus,
   onLineLeave,
-  renderSegment,
   selectedLineId,
 }: AlgorithmPapersProps) {
+  function renderSegments(segments: LatexBlock['require']) {
+    return segments?.map((segment, index) => (
+      <EquationSegment key={index} segment={segment} />
+    ))
+  }
+
   function renderAlgorithmRow(line: AlgorithmLine, displayNumber = line.number) {
     return (
       <AlgorithmRow
@@ -209,7 +161,6 @@ export function AlgorithmPapers({
         onActivate={onLineActivate}
         onFocus={onLineFocus}
         onLeave={onLineLeave}
-        renderSegment={renderSegment}
         selectedLineId={selectedLineId}
       />
     )
@@ -217,7 +168,12 @@ export function AlgorithmPapers({
 
   return (
     <div className="region math-region" onCopy={handleLatexSelectionCopy}>
-      <CopyButton copied={latexCopied} label="Copy LaTeX" onCopy={onCopyLatex} />
+      <CopyButton
+        copied={latexCopied}
+        label="Copy LaTeX"
+        onCopy={onCopyLatex}
+        showCopiedLabel
+      />
 
       {prelude?.map((part) => (
         <article
@@ -227,7 +183,7 @@ export function AlgorithmPapers({
         >
           <header className="algorithm-header">
             <strong>{part.title}</strong>
-            {part.require ? <h2>{part.require.map(renderSegment)}</h2> : null}
+            {part.require ? <h2>{renderSegments(part.require)}</h2> : null}
           </header>
           <div className="algorithm-lines">
             {part.rows.map((line, rowIndex) => renderAlgorithmRow(line, rowIndex + 1))}
@@ -248,7 +204,7 @@ export function AlgorithmPapers({
             </h2>
           </header>
           <p className="algorithm-require">
-            <strong>Require:</strong> {block.require.map(renderSegment)}
+            <strong>Require:</strong> {renderSegments(block.require)}
           </p>
           <div className="algorithm-lines">
             {block.rows.map((line, rowIndex) => renderAlgorithmRow(line, rowIndex + 1))}
@@ -268,7 +224,7 @@ export function AlgorithmPapers({
           </header>
           {note.require ? (
             <p className="algorithm-require">
-              <strong>{note.requireLabel ?? 'Given'}:</strong> {note.require.map(renderSegment)}
+              <strong>{note.requireLabel ?? 'Given'}:</strong> {renderSegments(note.require)}
             </p>
           ) : null}
           <div className="algorithm-lines">

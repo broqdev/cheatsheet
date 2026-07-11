@@ -45,9 +45,7 @@ function filteredCatalogSections(query: string) {
 }
 
 function selectableCatalogItems(query: string) {
-  return filteredCatalogSections(query)
-    .flatMap((section) => section.items)
-    .filter((item) => item.exampleId)
+  return filteredCatalogSections(query).flatMap((section) => section.items)
 }
 
 function catalogOptionId(itemId: string) {
@@ -159,10 +157,6 @@ export function CatalogDropdown({
   }
 
   function selectItem(item: CatalogItem) {
-    if (!item.exampleId) {
-      return
-    }
-
     onSelectExample(item.exampleId)
     closeSearch()
   }
@@ -281,16 +275,12 @@ export function CatalogDropdown({
                   {section.items.map((item) => {
                     const selected = item.exampleId === activeExampleId
                     const active = item.id === activeItem?.id
-                    const disabled = !item.exampleId
-
                     return (
                       <button
                         key={item.id}
                         type="button"
                         className={`catalog-item${selected ? ' selected' : ''}${active ? ' active' : ''}`}
-                        aria-disabled={disabled}
                         aria-selected={selected}
-                        disabled={disabled}
                         id={catalogOptionId(item.id)}
                         ref={(node) => {
                           if (node) {

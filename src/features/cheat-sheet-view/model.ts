@@ -7,6 +7,17 @@ export type ToggleDelta =
   | 'nesterov'
   | 'moonshotLr'
 
+export type VariantKey = ToggleDelta
+
+export type VariantState = Record<VariantKey, boolean>
+
+export type AlgorithmBlockRole = 'forward' | 'backward'
+
+export type AlgorithmBlockStart = {
+  id: string
+  role: AlgorithmBlockRole
+}
+
 export type Segment =
   | { kind: 'text'; value: string; delta?: ToggleDelta }
   | { kind: 'math'; value: string; delta?: ToggleDelta }
@@ -18,6 +29,7 @@ export type AlgorithmLine = {
   indent?: number
   parts: Segment[]
   codeLines: number[]
+  startsBlock?: AlgorithmBlockStart
 }
 
 export type AttentionMode = 'unmasked' | 'masked'
@@ -34,8 +46,15 @@ export type AttentionContent = {
   require: Segment[]
   rows: AlgorithmLine[]
   code: string
+  blocks: AlgorithmBlock[]
+  blockRequires?: Partial<Record<AlgorithmBlockRole, Segment[]>>
   prelude?: LatexBlock[]
   notes?: LatexBlock[]
+}
+
+export type AttentionVariant = {
+  enabled: VariantKey[]
+  content: Partial<Record<AttentionMode, AttentionContent>>
 }
 
 export type AttentionExample = {
@@ -45,21 +64,14 @@ export type AttentionExample = {
   description: string
   algorithmTitle: string
   content: Record<AttentionMode, AttentionContent>
-  dropoutContent?: Partial<Record<AttentionMode, AttentionContent>>
-  fp8Content?: Partial<Record<AttentionMode, AttentionContent>>
-  weightDecayContent?: Partial<Record<AttentionMode, AttentionContent>>
-  moonshotLrContent?: Partial<Record<AttentionMode, AttentionContent>>
-  moonshotLrWeightDecayContent?: Partial<Record<AttentionMode, AttentionContent>>
-  momentumContent?: Partial<Record<AttentionMode, AttentionContent>>
-  momentumWeightDecayContent?: Partial<Record<AttentionMode, AttentionContent>>
-  nesterovContent?: Partial<Record<AttentionMode, AttentionContent>>
-  nesterovWeightDecayContent?: Partial<Record<AttentionMode, AttentionContent>>
+  variants?: AttentionVariant[]
+  variantLabels?: Partial<Record<VariantKey, string>>
 }
 
 export type CatalogItem = {
   id: string
   label: string
-  exampleId?: string
+  exampleId: string
 }
 
 export type CatalogSection = {

@@ -8,6 +8,7 @@
     "render:cover": "node scripts/render-og-image.mjs",
     "build": "tsc -b && vite build",
     "preview": "vite preview --host 0.0.0.0",
+    "test": "node --test tests/*.test.mjs",
     "typecheck": "tsc -b"
   },
   "dependencies": {

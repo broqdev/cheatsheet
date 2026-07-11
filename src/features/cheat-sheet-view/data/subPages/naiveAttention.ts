@@ -1,9 +1,9 @@
 import type { AttentionExample } from '../../model'
 import naiveAttentionCode from './code/naiveAttention.py?raw'
 import maskedNaiveAttentionCode from './code/maskedNaiveAttention.py?raw'
-import { defineAttentionContent, type AlgorithmLineSpec, type LatexBlockSpec } from '../../lib/codeRefs'
+import { defineAttentionContent, type AlgorithmLineSpec, type LatexBlockSpec } from '../../lib/contentCompiler'
 import { math, strong, text } from '../../lib/segments'
-import { latexDelta } from '../../lib/toggleDeltas'
+import { latexDelta } from '../../lib/equationPresentation'
 
 const naiveRequire = [
   text('Matrices '),
@@ -33,9 +33,22 @@ const maskedNaiveRequire = [
   text('.'),
 ]
 
+const naiveBackwardRequire = [
+  text('Matrices '),
+  math(String.raw`Q,K,V,O,P`),
+  text(', QK scaling factor '),
+  math(String.raw`\alpha \in \mathbb{R}`),
+  text(' (usually '),
+  math(String.raw`\alpha=1/\sqrt{d}`),
+  text('), output gradient '),
+  math(String.raw`dO`),
+  text('.'),
+]
+
 const naiveRows: AlgorithmLineSpec[] = [
   {
     id: 'naive-forward-label',
+    startsBlock: { id: 'naive-forward', role: 'forward' },
     parts: [strong('Forward pass.')],
     codeRefs: ['forward-signature'],
   },
@@ -73,6 +86,7 @@ const naiveRows: AlgorithmLineSpec[] = [
   },
   {
     id: 'naive-backward-label',
+    startsBlock: { id: 'naive-backward', role: 'backward' },
     parts: [strong('Backward pass.')],
     codeRefs: ['backward-signature'],
   },
@@ -119,6 +133,7 @@ const naiveRows: AlgorithmLineSpec[] = [
 const maskedNaiveRows: AlgorithmLineSpec[] = [
   {
     id: 'naive-forward-label',
+    startsBlock: { id: 'naive-forward', role: 'forward' },
     parts: [strong('Forward pass.')],
     codeRefs: ['forward-signature'],
   },
@@ -166,6 +181,7 @@ const maskedNaiveRows: AlgorithmLineSpec[] = [
   },
   {
     id: 'naive-backward-label',
+    startsBlock: { id: 'naive-backward', role: 'backward' },
     parts: [strong('Backward pass.')],
     codeRefs: ['backward-signature'],
   },
@@ -434,12 +450,14 @@ export const naiveAttentionExample: AttentionExample = {
     unmasked: defineAttentionContent({
       rawCode: naiveAttentionCode,
       require: naiveRequire,
+      blockRequires: { backward: naiveBackwardRequire },
       rows: naiveRows,
       notes: [...softmaxBackwardNotes(false), ...naiveCostNotes],
     }),
     masked: defineAttentionContent({
       rawCode: maskedNaiveAttentionCode,
       require: maskedNaiveRequire,
+      blockRequires: { backward: naiveBackwardRequire },
       rows: maskedNaiveRows,
       notes: [...softmaxBackwardNotes(true), ...naiveCostNotes],
     }),

@@ -1,5 +1,5 @@
 import type { AttentionExample, Segment } from '../../model'
-import { defineAttentionContent, type AlgorithmLineSpec, type LatexBlockSpec } from '../../lib/codeRefs'
+import { defineAttentionContent, type AlgorithmLineSpec, type LatexBlockSpec } from '../../lib/contentCompiler'
 import { math, strong, text } from '../../lib/segments'
 import flashAttention4CuteDslCode from './code/flashAttention4CuteDsl.py?raw'
 

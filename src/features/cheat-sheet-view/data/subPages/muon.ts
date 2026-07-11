@@ -3,7 +3,7 @@ import muonCode from './code/muon.py?raw'
 import muonMoonshotLrCode from './code/muonMoonshotLr.py?raw'
 import muonMoonshotLrWeightDecayCode from './code/muonMoonshotLrWeightDecay.py?raw'
 import muonWeightDecayCode from './code/muonWeightDecay.py?raw'
-import { defineAttentionContent, type AlgorithmLineSpec, type LatexBlockSpec } from '../../lib/codeRefs'
+import { defineAttentionContent, type AlgorithmLineSpec, type LatexBlockSpec } from '../../lib/contentCompiler'
 import { math, strong, text } from '../../lib/segments'
 
 const muonRequire = [
@@ -52,6 +52,7 @@ function withMoonshotLrRequire(require: typeof muonRequire) {
 const muonRows: AlgorithmLineSpec[] = [
   {
     id: 'muon-forward-label',
+    startsBlock: { id: 'muon-forward', role: 'forward' },
     parts: [strong('Optimization step.')],
     codeRefs: ['step-signature', 'no-grad'],
   },
@@ -144,6 +145,7 @@ const muonRows: AlgorithmLineSpec[] = [
 const muonWeightDecayRows: AlgorithmLineSpec[] = [
   {
     id: 'muon-forward-label',
+    startsBlock: { id: 'muon-forward', role: 'forward' },
     parts: [strong('Optimization step with decoupled decay.')],
     codeRefs: ['step-signature', 'no-grad'],
   },
@@ -517,16 +519,21 @@ export const muonExample: AttentionExample = {
     unmasked: muonContent,
     masked: muonContent,
   },
-  weightDecayContent: {
-    unmasked: muonWeightDecayContent,
-    masked: muonWeightDecayContent,
-  },
-  moonshotLrContent: {
-    unmasked: muonMoonshotLrContent,
-    masked: muonMoonshotLrContent,
-  },
-  moonshotLrWeightDecayContent: {
-    unmasked: muonMoonshotLrWeightDecayContent,
-    masked: muonMoonshotLrWeightDecayContent,
-  },
+  variants: [
+    {
+      enabled: ['weightDecay'],
+      content: { unmasked: muonWeightDecayContent, masked: muonWeightDecayContent },
+    },
+    {
+      enabled: ['moonshotLr'],
+      content: { unmasked: muonMoonshotLrContent, masked: muonMoonshotLrContent },
+    },
+    {
+      enabled: ['moonshotLr', 'weightDecay'],
+      content: {
+        unmasked: muonMoonshotLrWeightDecayContent,
+        masked: muonMoonshotLrWeightDecayContent,
+      },
+    },
+  ],
 }

@@ -10,58 +10,112 @@ import { naiveAttentionExample } from './subPages/naiveAttention'
 import { rmspropExample } from './subPages/rmsprop'
 import { sgdExample } from './subPages/sgd'
 
-export const catalogSections: CatalogSection[] = [
+type CatalogGroup = {
+  id: string
+  label: string
+  examples: AttentionExample[]
+}
+
+const catalogGroups: CatalogGroup[] = [
   {
     id: 'attention',
     label: 'Attention',
-    items: [
-      { id: 'catalog-naive', label: 'Naive Attention', exampleId: 'naive' },
-      { id: 'catalog-flash-1', label: 'FlashAttention-1', exampleId: 'flash1' },
-      { id: 'catalog-flash-2', label: 'FlashAttention-2', exampleId: 'flash2' },
-      { id: 'catalog-flash-3', label: 'FlashAttention-3', exampleId: 'flash3' },
-      { id: 'catalog-flash-4', label: 'FlashAttention-4', exampleId: 'flash4' },
+    examples: [
+      naiveAttentionExample,
+      flashAttention1Example,
+      flashAttention2Example,
+      flashAttention3Example,
+      flashAttention4Example,
     ],
   },
   {
     id: 'optimizer',
     label: 'Optimizer',
-    items: [
-      { id: 'catalog-sgd', label: 'SGD', exampleId: 'sgd' },
-      { id: 'catalog-rmsprop', label: 'RMSprop', exampleId: 'rmsprop' },
-      { id: 'catalog-adam', label: 'Adam', exampleId: 'adam' },
-      { id: 'catalog-adamw', label: 'AdamW', exampleId: 'adamw' },
-      { id: 'catalog-muon', label: 'Muon', exampleId: 'muon' },
-    ],
+    examples: [sgdExample, rmspropExample, adamExample, adamWExample, muonExample],
   },
 ]
 
-export const examples: AttentionExample[] = [
-  naiveAttentionExample,
-  flashAttention1Example,
-  flashAttention2Example,
-  flashAttention3Example,
-  flashAttention4Example,
-  sgdExample,
-  rmspropExample,
-  adamExample,
-  adamWExample,
-  muonExample,
-]
+export function normalizeExampleTag(value: string) {
+  const routeValue = value.replace(/^#/, '').replace(/^\/+|\/+$/g, '')
+  let decodedValue = routeValue
 
-function exampleIdsForSection(section: CatalogSection) {
-  return section.items.flatMap((item) => (item.exampleId ? [item.exampleId] : []))
+  try {
+    decodedValue = decodeURIComponent(routeValue)
+  } catch {
+    decodedValue = routeValue
+  }
+
+  return decodedValue
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+}
+
+function tagsForExample(example: AttentionExample) {
+  return [example.id, example.urlTag, example.label].map(normalizeExampleTag)
+}
+
+function defineCatalog(groups: CatalogGroup[]) {
+  const examples = groups.flatMap((group) => group.examples)
+  const ids = new Set<string>()
+  const routes = new Set<string>()
+
+  for (const example of examples) {
+    const route = normalizeExampleTag(example.urlTag)
+
+    if (ids.has(example.id)) {
+      throw new Error(`Duplicate cheatsheet example id "${example.id}".`)
+    }
+
+    if (routes.has(route)) {
+      throw new Error(`Duplicate cheatsheet route "${example.urlTag}".`)
+    }
+
+    ids.add(example.id)
+    routes.add(route)
+  }
+
+  const sections: CatalogSection[] = groups.map((group) => ({
+    id: group.id,
+    label: group.label,
+    items: group.examples.map((example) => ({
+      id: `catalog-${example.id}`,
+      label: example.label,
+      exampleId: example.id,
+    })),
+  }))
+
+  return { examples, groups, sections }
+}
+
+export const cheatsheetCatalog = defineCatalog(catalogGroups)
+export const examples = cheatsheetCatalog.examples
+export const catalogSections = cheatsheetCatalog.sections
+
+export function exampleFromTag(value: string) {
+  const tag = normalizeExampleTag(value)
+
+  return tag
+    ? examples.find((example) => tagsForExample(example).includes(tag))
+    : undefined
+}
+
+export function routeSegmentsForExample(example: AttentionExample) {
+  return example.urlTag
+    .split('/')
+    .map(normalizeExampleTag)
+    .filter(Boolean)
 }
 
 export function examplesForExampleGroup(exampleId: string) {
-  const activeSection = catalogSections.find((section) =>
-    exampleIdsForSection(section).includes(exampleId)
+  const activeGroup = cheatsheetCatalog.groups.find((group) =>
+    group.examples.some((example) => example.id === exampleId)
   )
 
-  if (!activeSection) {
+  if (!activeGroup) {
     return examples
   }
 
-  const activeSectionExampleIds = new Set(exampleIdsForSection(activeSection))
-
-  return examples.filter((example) => activeSectionExampleIds.has(example.id))
+  return activeGroup.examples
 }

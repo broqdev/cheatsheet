@@ -3,7 +3,7 @@ import flashAttention3Code from './code/flashAttention3Gluon.py?raw'
 import causalFlashAttention3Code from './code/causalFlashAttention3Gluon.py?raw'
 import flashAttention3HopperFp8Code from './code/flashAttention3GluonHopperFp8.py?raw'
 import causalFlashAttention3HopperFp8Code from './code/causalFlashAttention3GluonHopperFp8.py?raw'
-import { defineAttentionContent, type AlgorithmLineSpec, type LatexBlockSpec } from '../../lib/codeRefs'
+import { defineAttentionContent, type AlgorithmLineSpec, type LatexBlockSpec } from '../../lib/contentCompiler'
 import { math, strong, text } from '../../lib/segments'
 
 const mappedCodeRefIds = new Set([
@@ -1016,19 +1016,25 @@ export const flashAttention3Example: AttentionExample = {
       ignoredUnusedRefs: fp8CodeRefIds,
     }),
   },
-  fp8Content: {
-    unmasked: defineAttentionContent({
-      rawCode: flashAttention3HopperFp8Code,
-      require: hopperFp8Flash3ForwardRequire,
-      prelude: flash3HardwarePrelude,
-      rows: hopperFp8Flash3Rows,
-      ignoredUnusedRefs: causalCodeRefIds,
-    }),
-    masked: defineAttentionContent({
-      rawCode: causalFlashAttention3HopperFp8Code,
-      require: causalHopperFp8Flash3ForwardRequire,
-      prelude: flash3HardwarePrelude,
-      rows: causalHopperFp8Flash3Rows,
-    }),
-  },
+  variants: [
+    {
+      enabled: ['fp8'],
+      content: {
+        unmasked: defineAttentionContent({
+          rawCode: flashAttention3HopperFp8Code,
+          require: hopperFp8Flash3ForwardRequire,
+          prelude: flash3HardwarePrelude,
+          rows: hopperFp8Flash3Rows,
+          ignoredUnusedRefs: causalCodeRefIds,
+        }),
+        masked: defineAttentionContent({
+          rawCode: causalFlashAttention3HopperFp8Code,
+          require: causalHopperFp8Flash3ForwardRequire,
+          prelude: flash3HardwarePrelude,
+          rows: causalHopperFp8Flash3Rows,
+        }),
+      },
+    },
+  ],
+  variantLabels: { mask: 'Causal Attention' },
 }
