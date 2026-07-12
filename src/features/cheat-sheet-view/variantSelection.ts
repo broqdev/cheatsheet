@@ -16,6 +16,11 @@ type VariantDefinition = {
 const variantDefinitions: Record<VariantKey, VariantDefinition> = {
   mask: { aliases: ['mask'], color: '#9a3412', label: 'Attention mask' },
   dropout: { aliases: ['dropout'], color: '#6d28d9', label: 'Dropout' },
+  centered: {
+    aliases: ['centered'],
+    color: '#0f766e',
+    label: 'Centered Gradient Average',
+  },
   weightDecay: {
     aliases: ['weightDecay', 'wd'],
     color: '#047857',
@@ -42,6 +47,7 @@ const legacyStateKeys = {
   mask: 'attentionMaskEnabled',
   dropout: 'dropoutEnabled',
   fp8: 'fp8Enabled',
+  centered: 'centeredEnabled',
   weightDecay: 'weightDecayEnabled',
   moonshotLr: 'moonshotLrEnabled',
   momentum: 'momentumEnabled',

@@ -2,8 +2,8 @@ import torch
 
 
 # @ref step-signature
-def rmsprop_step(params, grads, state, lr, alpha=0.99, eps=1e-8, momentum=0.9, weight_decay=0.0, centered=False):
-    """One RMSprop step with momentum and coupled L2 weight decay."""
+def rmsprop_step(params, grads, state, lr, alpha=0.99, eps=1e-8, momentum=0.9, weight_decay=0.0):
+    """One RMSProp step with momentum and coupled L2 weight decay."""
 # @end
 # @ref no-grad
     with torch.no_grad():
@@ -30,22 +30,10 @@ def rmsprop_step(params, grads, state, lr, alpha=0.99, eps=1e-8, momentum=0.9, w
                 d_p = d_p.add(param, alpha=weight_decay)
 # @end
 # @ref square-average
-            square_avg.lerp_(d_p.square(), 1.0 - alpha)
-# @end
-# @ref centered-average
-            avg = square_avg
-            if centered:
-# @end
-# @ref centered-state-init centered-average
-                if (grad_avg := param_state.get("grad_avg")) is None:
-                    grad_avg = param_state["grad_avg"] = torch.zeros_like(param)
-# @end
-# @ref centered-average
-                grad_avg.lerp_(d_p, 1.0 - alpha)
-                avg = avg.addcmul(grad_avg, grad_avg, value=-1.0)
+            square_avg.mul_(alpha).addcmul_(d_p, d_p, value=1.0 - alpha)
 # @end
 # @ref denominator
-            avg = avg.sqrt().add_(eps)
+            avg = square_avg.sqrt().add_(eps)
 # @end
 # @ref momentum
             buffer.mul_(momentum).addcdiv_(d_p, avg)

@@ -1,5 +1,5 @@
 import { type KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { catalogSections } from '../data/attentionExamples'
+import { navigationCatalogSections } from '../data/attentionExamples'
 import type { CatalogItem } from '../model'
 
 function normalizeCatalogQuery(value: string) {
@@ -34,7 +34,7 @@ function fuzzyMatch(label: string, query: string) {
 }
 
 function filteredCatalogSections(query: string) {
-  return catalogSections
+  return navigationCatalogSections
     .map((section) => {
       const sectionMatches = fuzzyMatch(section.label, query)
       const items = section.items.filter((item) => sectionMatches || fuzzyMatch(item.label, query))

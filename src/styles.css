@@ -212,11 +212,11 @@
   }
 
   .example-nav button {
-    @apply relative inline-flex min-h-[34px] cursor-pointer items-end border-0 bg-transparent px-0 pt-0 pb-1.5 text-base leading-none font-extrabold tracking-normal text-muted transition-[transform,color,opacity] duration-150 ease-out;
+    @apply relative inline-flex min-h-[34px] cursor-pointer items-start border-0 bg-transparent px-0 pt-0 pb-1.5 text-base leading-none font-extrabold tracking-normal text-muted transition-[transform,color,opacity] duration-150 ease-out;
   }
 
   .example-nav button::after {
-    @apply absolute right-0 bottom-0 left-0 h-[3px] bg-transparent transition-colors duration-150 ease-out content-[""];
+    @apply absolute right-0 bottom-2 left-0 h-[3px] bg-transparent transition-colors duration-150 ease-out content-[""];
   }
 
   .example-nav button:hover {
@@ -270,19 +270,23 @@
 
   .math-region .region-copy-button {
     --copy-shift-x: 0px;
-    @apply absolute top-3 right-[22px] z-[4] h-9 w-9 min-w-9 mt-0 mr-0 mb-0 ml-0;
+    @apply sticky top-0 right-0 z-[4] justify-self-end mt-0 mr-0 mb-[-32px] ml-0;
   }
 
   .math-region .region-copy-button--confirmed {
     @apply border-[rgba(0,127,112,0.56)] text-accent;
   }
 
+  .math-region > .region-copy-button + .algorithm-paper {
+    @apply mt-[-18px];
+  }
+
   .math-region > .algorithm-paper:first-of-type .algorithm-header {
-    @apply pr-[116px];
+    @apply pr-12;
   }
 
   .math-region {
-    @apply grid content-start gap-[18px] overflow-x-hidden overflow-y-auto border-r border-line bg-[rgba(255,255,255,0.78)] px-[22px] pt-3 pb-5 backdrop-blur-md;
+    @apply grid content-start gap-[18px] overflow-x-hidden overflow-y-auto border-r border-line bg-[rgba(255,255,255,0.78)] px-[22px] pt-[22px] pb-5 backdrop-blur-md;
   }
 
   .algorithm-paper {
@@ -352,7 +356,7 @@
   }
 
   .code-region .region-copy-button {
-    @apply border-[rgba(232,240,237,0.2)] bg-[rgba(17,24,22,0.9)] text-[#e8f0ed] shadow-[2px_2px_0_rgba(255,176,0,0.18)];
+    @apply sticky top-0 right-2 z-[4] mt-0 mr-2 mb-[-32px] ml-auto border-[rgba(232,240,237,0.2)] bg-[rgba(17,24,22,0.9)] text-[#e8f0ed] shadow-[2px_2px_0_rgba(255,176,0,0.18)];
   }
 
   .code-region .region-copy-button:hover {
@@ -531,11 +535,11 @@
   }
 
   .math-region {
-    @apply px-[18px] pt-3 pb-[18px];
+    @apply px-[18px] pt-[18px] pb-[18px];
   }
 
   .math-region .region-copy-button {
-    @apply right-[18px];
+    @apply top-0;
   }
 
   .katex {

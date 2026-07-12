@@ -1,10 +1,12 @@
 import type { AttentionExample, CatalogSection } from '../model'
+import { adagradExample } from './subPages/adagrad'
 import { adamExample } from './subPages/adam'
 import { adamWExample } from './subPages/adamw'
 import { flashAttention1Example } from './subPages/flashAttention1'
 import { flashAttention2Example } from './subPages/flashAttention2'
 import { flashAttention3Example } from './subPages/flashAttention3'
 import { flashAttention4Example } from './subPages/flashAttention4'
+import { lbfgsExample } from './subPages/lbfgs'
 import { muonExample } from './subPages/muon'
 import { naiveAttentionExample } from './subPages/naiveAttention'
 import { rmspropExample } from './subPages/rmsprop'
@@ -14,6 +16,7 @@ type CatalogGroup = {
   id: string
   label: string
   examples: AttentionExample[]
+  hiddenExampleIds?: string[]
 }
 
 const catalogGroups: CatalogGroup[] = [
@@ -31,7 +34,16 @@ const catalogGroups: CatalogGroup[] = [
   {
     id: 'optimizer',
     label: 'Optimizer',
-    examples: [sgdExample, rmspropExample, adamExample, adamWExample, muonExample],
+    examples: [
+      sgdExample,
+      adagradExample,
+      rmspropExample,
+      adamExample,
+      adamWExample,
+      lbfgsExample,
+      muonExample,
+    ],
+    hiddenExampleIds: ['lbfgs'],
   },
 ]
 
@@ -83,6 +95,7 @@ function defineCatalog(groups: CatalogGroup[]) {
       id: `catalog-${example.id}`,
       label: example.label,
       exampleId: example.id,
+      hidden: group.hiddenExampleIds?.includes(example.id),
     })),
   }))
 
@@ -92,6 +105,12 @@ function defineCatalog(groups: CatalogGroup[]) {
 export const cheatsheetCatalog = defineCatalog(catalogGroups)
 export const examples = cheatsheetCatalog.examples
 export const catalogSections = cheatsheetCatalog.sections
+export const navigationCatalogSections = catalogSections
+  .map((section) => ({
+    ...section,
+    items: section.items.filter((item) => !item.hidden),
+  }))
+  .filter((section) => section.items.length > 0)
 
 export function exampleFromTag(value: string) {
   const tag = normalizeExampleTag(value)
@@ -117,5 +136,6 @@ export function examplesForExampleGroup(exampleId: string) {
     return examples
   }
 
-  return activeGroup.examples
+  const hiddenExampleIds = new Set(activeGroup.hiddenExampleIds ?? [])
+  return activeGroup.examples.filter((example) => !hiddenExampleIds.has(example.id))
 }

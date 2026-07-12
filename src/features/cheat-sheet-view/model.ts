@@ -2,6 +2,7 @@ export type ToggleDelta =
   | 'mask'
   | 'dropout'
   | 'fp8'
+  | 'centered'
   | 'weightDecay'
   | 'momentum'
   | 'nesterov'
@@ -72,6 +73,7 @@ export type CatalogItem = {
   id: string
   label: string
   exampleId: string
+  hidden?: boolean
 }
 
 export type CatalogSection = {
