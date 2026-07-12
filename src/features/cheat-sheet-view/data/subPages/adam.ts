@@ -6,9 +6,9 @@ import { math, strong, text } from '../../lib/segments'
 
 const adamRequire = [
   text('Parameters '),
-  math(String.raw`\theta_t`),
+  math(String.raw`\theta_{t-1}`),
   text(', gradients '),
-  math(String.raw`g_t=\nabla_{\theta}L_t(\theta_t)`),
+  math(String.raw`g_t=\nabla_{\theta}L_t(\theta_{t-1})`),
   text(', learning rate '),
   math(String.raw`\gamma`),
   text(', moment coefficients '),
@@ -16,15 +16,15 @@ const adamRequire = [
   text(', numerical constant '),
   math(String.raw`\epsilon`),
   text(', and optimizer state '),
-  math(String.raw`\{t,m_{t-1},v_{t-1}\}`),
+  math(String.raw`\{t-1,m_{t-1},v_{t-1}\}`),
   text('.'),
 ]
 
 const adamWeightDecayRequire = [
   text('Parameters '),
-  math(String.raw`\theta_t`),
+  math(String.raw`\theta_{t-1}`),
   text(', gradients '),
-  math(String.raw`g_t=\nabla_{\theta}L_t(\theta_t)`),
+  math(String.raw`g_t=\nabla_{\theta}L_t(\theta_{t-1})`),
   text(', learning rate '),
   math(String.raw`\gamma`),
   text(', moment coefficients '),
@@ -34,7 +34,7 @@ const adamWeightDecayRequire = [
   text(', coupled weight decay ', 'weightDecay'),
   math(String.raw`\lambda`, 'weightDecay'),
   text(', and optimizer state '),
-  math(String.raw`\{t,m_{t-1},v_{t-1}\}`),
+  math(String.raw`\{t-1,m_{t-1},v_{t-1}\}`),
   text('.'),
 ]
 
@@ -49,7 +49,7 @@ const adamRows: AlgorithmLineSpec[] = [
     number: 1,
     parts: [
       text('For each parameter tensor '),
-      math(String.raw`\theta_t`),
+      math(String.raw`\theta_{t-1}`),
       text(' and gradient tensor '),
       math(String.raw`g_t`),
       text('.'),
@@ -60,7 +60,9 @@ const adamRows: AlgorithmLineSpec[] = [
     id: 'adam-state-init',
     number: 2,
     parts: [
-      text('Increment timestep '),
+      text('Advance the timestep from '),
+      math(String.raw`t-1`),
+      text(' to '),
       math(String.raw`t`),
       text(' and initialize moment state '),
       math(String.raw`m_{t-1},v_{t-1}`),
@@ -115,7 +117,7 @@ const adamRows: AlgorithmLineSpec[] = [
     number: 7,
     parts: [
       text('Apply the parameter update '),
-      math(String.raw`\theta_{t+1}=\theta_t-\gamma\hat{m}_t/(\sqrt{\hat{v}_t}+\epsilon)`),
+      math(String.raw`\theta_t=\theta_{t-1}-\gamma\hat{m}_t/(\sqrt{\hat{v}_t}+\epsilon)`),
       text(' with no separate parameter shrink.'),
     ],
     codeRefs: ['update'],
@@ -143,7 +145,7 @@ const adamWeightDecayRows: AlgorithmLineSpec[] = [
     number: 1,
     parts: [
       text('For each parameter tensor '),
-      math(String.raw`\theta_t`),
+      math(String.raw`\theta_{t-1}`),
       text(' and gradient tensor '),
       math(String.raw`g_t`),
       text('.'),
@@ -154,7 +156,9 @@ const adamWeightDecayRows: AlgorithmLineSpec[] = [
     id: 'adam-state-init',
     number: 2,
     parts: [
-      text('Increment timestep '),
+      text('Advance the timestep from '),
+      math(String.raw`t-1`),
+      text(' to '),
       math(String.raw`t`),
       text(' and initialize moment state '),
       math(String.raw`m_{t-1},v_{t-1}`),
@@ -177,7 +181,7 @@ const adamWeightDecayRows: AlgorithmLineSpec[] = [
     number: 4,
     parts: [
       text('Add coupled L2 weight decay ', 'weightDecay'),
-      math(String.raw`d_t \leftarrow d_t+\lambda\theta_t`, 'weightDecay'),
+      math(String.raw`d_t \leftarrow d_t+\lambda\theta_{t-1}`, 'weightDecay'),
       text(' before moment updates, so both moments include the penalty.', 'weightDecay'),
     ],
     codeRefs: ['weight-decay'],
@@ -219,7 +223,7 @@ const adamWeightDecayRows: AlgorithmLineSpec[] = [
     number: 8,
     parts: [
       text('Apply the parameter update '),
-      math(String.raw`\theta_{t+1}=\theta_t-\gamma\hat{m}_t/(\sqrt{\hat{v}_t}+\epsilon)`),
+      math(String.raw`\theta_t=\theta_{t-1}-\gamma\hat{m}_t/(\sqrt{\hat{v}_t}+\epsilon)`),
       text(' using moments of the regularized gradient.'),
     ],
     codeRefs: ['update'],

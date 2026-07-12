@@ -8,9 +8,9 @@ import { math, strong, text } from '../../lib/segments'
 
 const muonRequire = [
   text('Hidden 2D matrix parameters '),
-  math(String.raw`\theta_t`),
+  math(String.raw`\theta_{t-1}`),
   text(', gradients '),
-  math(String.raw`g_t=\nabla_{\theta}L_t(\theta_t)`),
+  math(String.raw`g_t=\nabla_{\theta}L_t(\theta_{t-1})`),
   text(', learning rate '),
   math(String.raw`\gamma`),
   text(', momentum coefficient '),
@@ -24,9 +24,9 @@ const muonRequire = [
 
 const muonWeightDecayRequire = [
   text('Hidden 2D matrix parameters '),
-  math(String.raw`\theta_t`),
+  math(String.raw`\theta_{t-1}`),
   text(', gradients '),
-  math(String.raw`g_t=\nabla_{\theta}L_t(\theta_t)`),
+  math(String.raw`g_t=\nabla_{\theta}L_t(\theta_{t-1})`),
   text(', learning rate '),
   math(String.raw`\gamma`),
   text(', momentum coefficient '),
@@ -60,9 +60,9 @@ const muonRows: AlgorithmLineSpec[] = [
     number: 1,
     parts: [
       text('For each hidden matrix parameter '),
-      math(String.raw`\theta_t`),
+      math(String.raw`\theta_{t-1}`),
       text(' with '),
-      math(String.raw`\theta_t\in\mathbb{R}^{M\times N}`),
+      math(String.raw`\theta_{t-1}\in\mathbb{R}^{M\times N}`),
       text(' and gradient '),
       math(String.raw`g_t`),
       text('.'),
@@ -124,7 +124,7 @@ const muonRows: AlgorithmLineSpec[] = [
     number: 7,
     parts: [
       text('Update parameters '),
-      math(String.raw`\theta_{t+1}=\theta_t-\alpha_t O_t`),
+      math(String.raw`\theta_t=\theta_{t-1}-\alpha_t O_t`),
       text('.'),
     ],
     codeRefs: ['update'],
@@ -152,9 +152,9 @@ const muonWeightDecayRows: AlgorithmLineSpec[] = [
     number: 1,
     parts: [
       text('For each hidden matrix parameter '),
-      math(String.raw`\theta_t`),
+      math(String.raw`\theta_{t-1}`),
       text(' with '),
-      math(String.raw`\theta_t\in\mathbb{R}^{M\times N}`),
+      math(String.raw`\theta_{t-1}\in\mathbb{R}^{M\times N}`),
       text(' and gradient '),
       math(String.raw`g_t`),
       text('.'),
@@ -206,7 +206,10 @@ const muonWeightDecayRows: AlgorithmLineSpec[] = [
     number: 6,
     parts: [
       text('Apply decoupled weight decay ', 'weightDecay'),
-      math(String.raw`\theta_t\leftarrow(1-\gamma\lambda)\theta_t`, 'weightDecay'),
+      math(
+        String.raw`\theta_t^{\mathrm{decay}}=(1-\gamma\lambda)\theta_{t-1}`,
+        'weightDecay'
+      ),
       text(' before the Muon update.', 'weightDecay'),
     ],
     codeRefs: ['weight-decay'],
@@ -226,7 +229,7 @@ const muonWeightDecayRows: AlgorithmLineSpec[] = [
     number: 8,
     parts: [
       text('Update parameters '),
-      math(String.raw`\theta_{t+1}=\theta_t-\alpha_t O_t`),
+      math(String.raw`\theta_t=\theta_t^{\mathrm{decay}}-\alpha_t O_t`),
       text('.'),
     ],
     codeRefs: ['update'],
@@ -389,7 +392,7 @@ const muonLearningRateNote: LatexBlockSpec = {
   title: 'Learning-rate shape scaling',
   require: [
     text('Matrix parameter '),
-    math(String.raw`\theta_t\in\mathbb{R}^{M\times N}`),
+    math(String.raw`\theta_{t-1}\in\mathbb{R}^{M\times N}`),
     text(', polar update '),
     math(String.raw`O_t`),
     text(', and base learning rate '),

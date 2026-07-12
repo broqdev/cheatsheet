@@ -16,9 +16,9 @@ type SgdVariant = {
 
 const baseRequire = [
   text('Parameters '),
-  math(String.raw`\theta_t`),
+  math(String.raw`\theta_{t-1}`),
   text(', gradients '),
-  math(String.raw`g_t=\nabla_{\theta}L_t(\theta_t)`),
+  math(String.raw`g_t=\nabla_{\theta}L_t(\theta_{t-1})`),
   text(', and learning rate '),
   math(String.raw`\gamma`),
 ]
@@ -69,7 +69,7 @@ function sgdRows({ momentum, nesterov, weightDecay }: SgdVariant): AlgorithmLine
       id: 'sgd-loop',
       parts: [
         text('For each parameter tensor '),
-        math(String.raw`\theta_t`),
+        math(String.raw`\theta_{t-1}`),
         text(' and gradient tensor '),
         math(String.raw`g_t`),
         text('.'),
@@ -93,7 +93,7 @@ function sgdRows({ momentum, nesterov, weightDecay }: SgdVariant): AlgorithmLine
         id: 'sgd-weight-decay',
         parts: [
           text('Add coupled L2 weight decay ', 'weightDecay'),
-          math(String.raw`d_t \leftarrow d_t+\lambda\theta_t`, 'weightDecay'),
+          math(String.raw`d_t \leftarrow d_t+\lambda\theta_{t-1}`, 'weightDecay'),
           text(momentum ? ' before momentum.' : '.', 'weightDecay'),
         ],
         codeRefs: ['weight-decay'],
@@ -146,8 +146,8 @@ function sgdRows({ momentum, nesterov, weightDecay }: SgdVariant): AlgorithmLine
           text('Apply the parameter update '),
           math(
             nesterov
-              ? String.raw`\theta_{t+1}=\theta_t-\gamma\hat{b}_t`
-              : String.raw`\theta_{t+1}=\theta_t-\gamma b_t`,
+              ? String.raw`\theta_t=\theta_{t-1}-\gamma\hat{b}_t`
+              : String.raw`\theta_t=\theta_{t-1}-\gamma b_t`,
             nesterov ? 'nesterov' : 'momentum'
           ),
           text('.'),
@@ -173,7 +173,7 @@ function sgdRows({ momentum, nesterov, weightDecay }: SgdVariant): AlgorithmLine
       id: 'sgd-update',
       parts: [
         text('Apply the parameter update '),
-        math(String.raw`\theta_{t+1}=\theta_t-\gamma d_t`),
+        math(String.raw`\theta_t=\theta_{t-1}-\gamma d_t`),
         text('.'),
       ],
       codeRefs: ['update'],
@@ -182,7 +182,7 @@ function sgdRows({ momentum, nesterov, weightDecay }: SgdVariant): AlgorithmLine
       id: 'sgd-return',
       parts: [
         text('Return the updated parameters '),
-        math(String.raw`\theta_{t+1}`),
+        math(String.raw`\theta_t`),
         text('.'),
       ],
       codeRefs: ['return-params'],
@@ -222,7 +222,7 @@ const pytorchNesterovNote: LatexBlockSpec = {
       id: 'sgd-pytorch-nesterov-theta',
       indent: 1,
       parts: [
-        math(String.raw`\theta_{t+1}=\theta_t-\gamma(d_t+\mu b_t)=\theta_t-\gamma\left(d_t+\mu(\mu b_{t-1}+d_t)\right)`),
+        math(String.raw`\theta_t=\theta_{t-1}-\gamma(d_t+\mu b_t)=\theta_{t-1}-\gamma\left(d_t+\mu(\mu b_{t-1}+d_t)\right)`),
       ],
       codeRefs: ['momentum', 'nesterov', 'update'],
     },
@@ -240,7 +240,7 @@ const pytorchNesterovNote: LatexBlockSpec = {
       id: 'sgd-sutskever-nesterov-theta',
       indent: 1,
       parts: [
-        math(String.raw`\theta_{t+1}=\theta_t-(\gamma d_t+\mu b_t)=\theta_t-\left(\gamma d_t+\mu(\mu b_{t-1}+\gamma d_t)\right)`),
+        math(String.raw`\theta_t=\theta_{t-1}-(\gamma d_t+\mu b_t)=\theta_{t-1}-\left(\gamma d_t+\mu(\mu b_{t-1}+\gamma d_t)\right)`),
       ],
     },
     {

@@ -6,9 +6,9 @@ import { math, strong, text } from '../../lib/segments'
 
 const adamWRequire = [
   text('Parameters '),
-  math(String.raw`\theta_t`),
+  math(String.raw`\theta_{t-1}`),
   text(', gradients '),
-  math(String.raw`g_t=\nabla_{\theta}L_t(\theta_t)`),
+  math(String.raw`g_t=\nabla_{\theta}L_t(\theta_{t-1})`),
   text(', learning rate '),
   math(String.raw`\gamma`),
   text(', moment coefficients '),
@@ -16,15 +16,15 @@ const adamWRequire = [
   text(', numerical constant '),
   math(String.raw`\epsilon`),
   text(', and optimizer state '),
-  math(String.raw`\{t,m_{t-1},v_{t-1}\}`),
+  math(String.raw`\{t-1,m_{t-1},v_{t-1}\}`),
   text('.'),
 ]
 
 const adamWWeightDecayRequire = [
   text('Parameters '),
-  math(String.raw`\theta_t`),
+  math(String.raw`\theta_{t-1}`),
   text(', gradients '),
-  math(String.raw`g_t=\nabla_{\theta}L_t(\theta_t)`),
+  math(String.raw`g_t=\nabla_{\theta}L_t(\theta_{t-1})`),
   text(', learning rate '),
   math(String.raw`\gamma`),
   text(', moment coefficients '),
@@ -34,7 +34,7 @@ const adamWWeightDecayRequire = [
   text(', decoupled weight decay ', 'weightDecay'),
   math(String.raw`\lambda`, 'weightDecay'),
   text(', and optimizer state '),
-  math(String.raw`\{t,m_{t-1},v_{t-1}\}`),
+  math(String.raw`\{t-1,m_{t-1},v_{t-1}\}`),
   text('.'),
 ]
 
@@ -49,7 +49,7 @@ const adamWRows: AlgorithmLineSpec[] = [
     number: 1,
     parts: [
       text('For each parameter tensor '),
-      math(String.raw`\theta_t`),
+      math(String.raw`\theta_{t-1}`),
       text(' and gradient tensor '),
       math(String.raw`g_t`),
       text('.'),
@@ -60,7 +60,9 @@ const adamWRows: AlgorithmLineSpec[] = [
     id: 'adamw-state-init',
     number: 2,
     parts: [
-      text('Increment timestep '),
+      text('Advance the timestep from '),
+      math(String.raw`t-1`),
+      text(' to '),
       math(String.raw`t`),
       text(' and initialize moment state '),
       math(String.raw`m_{t-1},v_{t-1}`),
@@ -115,7 +117,7 @@ const adamWRows: AlgorithmLineSpec[] = [
     number: 7,
     parts: [
       text('Apply the adaptive update '),
-      math(String.raw`\theta_{t+1}=\theta_t-\gamma\hat{m}_t/(\sqrt{\hat{v}_t}+\epsilon)`),
+      math(String.raw`\theta_t=\theta_{t-1}-\gamma\hat{m}_t/(\sqrt{\hat{v}_t}+\epsilon)`),
       text('; with '),
       math(String.raw`\lambda=0`),
       text(', this matches Adam.'),
@@ -145,7 +147,7 @@ const adamWWeightDecayRows: AlgorithmLineSpec[] = [
     number: 1,
     parts: [
       text('For each parameter tensor '),
-      math(String.raw`\theta_t`),
+      math(String.raw`\theta_{t-1}`),
       text(' and gradient tensor '),
       math(String.raw`g_t`),
       text('.'),
@@ -156,7 +158,9 @@ const adamWWeightDecayRows: AlgorithmLineSpec[] = [
     id: 'adamw-state-init',
     number: 2,
     parts: [
-      text('Increment timestep '),
+      text('Advance the timestep from '),
+      math(String.raw`t-1`),
+      text(' to '),
       math(String.raw`t`),
       text(' and initialize moment state '),
       math(String.raw`m_{t-1},v_{t-1}`),
@@ -179,7 +183,10 @@ const adamWWeightDecayRows: AlgorithmLineSpec[] = [
     number: 4,
     parts: [
       text('Apply decoupled weight decay ', 'weightDecay'),
-      math(String.raw`\theta_t \leftarrow \theta_t-\gamma\lambda\theta_t`, 'weightDecay'),
+      math(
+        String.raw`\theta_t^{\mathrm{decay}}=(1-\gamma\lambda)\theta_{t-1}`,
+        'weightDecay'
+      ),
       text(' outside the gradient path; the moments still use ', 'weightDecay'),
       math(String.raw`d_t=g_t`, 'weightDecay'),
       text('.', 'weightDecay'),
@@ -223,7 +230,9 @@ const adamWWeightDecayRows: AlgorithmLineSpec[] = [
     number: 8,
     parts: [
       text('Apply the adaptive update '),
-      math(String.raw`\theta_{t+1}=\theta_t-\gamma\hat{m}_t/(\sqrt{\hat{v}_t}+\epsilon)`),
+      math(
+        String.raw`\theta_t=\theta_t^{\mathrm{decay}}-\gamma\hat{m}_t/(\sqrt{\hat{v}_t}+\epsilon)`
+      ),
       text(' after the decoupled shrink.'),
     ],
     codeRefs: ['update'],
