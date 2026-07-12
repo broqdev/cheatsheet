@@ -249,13 +249,13 @@
 
   .region-copy-button {
     --copy-shift-x: 0px;
-    --copy-shift-y: 0px;
+    --copy-shift-y: -4px;
     @apply sticky top-[-16px] z-[3] ml-auto grid h-8 w-8 cursor-pointer place-items-center rounded-[7px] border border-[rgba(24,32,30,0.34)] bg-[rgba(255,255,255,0.9)] text-ink shadow-[2px_2px_0_rgba(0,127,112,0.1)] transition-[background,border-color,color,transform] duration-150 ease-out mt-[-38px] mr-2 mb-1.5;
     transform: translate(var(--copy-shift-x), var(--copy-shift-y));
   }
 
   .region-copy-button:hover {
-    --copy-shift-y: -1px;
+    --copy-shift-y: -5px;
     @apply border-[rgba(0,127,112,0.56)] bg-white text-accent;
   }
 
@@ -269,7 +269,7 @@
   }
 
   .math-region .region-copy-button {
-    --copy-shift-x: 0px;
+    --copy-shift-x: 16px;
     @apply sticky top-0 right-0 z-[4] justify-self-end mt-0 mr-0 mb-[-32px] ml-0;
   }
 
