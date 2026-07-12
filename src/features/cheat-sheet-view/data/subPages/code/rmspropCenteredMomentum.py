@@ -2,8 +2,16 @@ import torch
 
 
 # @ref step-signature
-def rmsprop_step(params, grads, state, lr, alpha=0.99, eps=1e-8, momentum=0.9):
-    """One RMSProp step with momentum."""
+def rmsprop_step(
+    params,
+    grads,
+    state,
+    lr,
+    alpha=0.99,
+    eps=1e-8,
+    momentum=0.9,
+):
+    """One centered RMSProp step with momentum."""
 # @end
 # @ref no-grad
     with torch.no_grad():
@@ -18,6 +26,10 @@ def rmsprop_step(params, grads, state, lr, alpha=0.99, eps=1e-8, momentum=0.9):
             if (square_avg := param_state.get("square_avg")) is None:
                 square_avg = param_state["square_avg"] = torch.zeros_like(param)
 # @end
+# @ref centered-state-init
+            if (grad_avg := param_state.get("grad_avg")) is None:
+                grad_avg = param_state["grad_avg"] = torch.zeros_like(param)
+# @end
 # @ref momentum-state-init
             if (buffer := param_state.get("momentum_buffer")) is None:
                 buffer = param_state["momentum_buffer"] = torch.zeros_like(param)
@@ -28,8 +40,12 @@ def rmsprop_step(params, grads, state, lr, alpha=0.99, eps=1e-8, momentum=0.9):
 # @ref square-average
             square_avg.mul_(alpha).addcmul_(d_p, d_p, value=1.0 - alpha)
 # @end
+# @ref centered-average
+            grad_avg.mul_(alpha).add_(d_p, alpha=1.0 - alpha)
+            avg = square_avg.addcmul(grad_avg, grad_avg, value=-1.0)
+# @end
 # @ref denominator
-            avg = square_avg.sqrt().add_(eps)
+            avg = avg.sqrt().add_(eps)
 # @end
 # @ref momentum
             buffer.mul_(momentum).addcdiv_(d_p, avg)

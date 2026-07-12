@@ -4,6 +4,7 @@ export const toggleDeltaColors = {
   mask: '#9a3412',
   dropout: '#6d28d9',
   fp8: '#006d8f',
+  centered: '#0369a1',
   weightDecay: '#047857',
   momentum: '#b45309',
   nesterov: '#c026d3',

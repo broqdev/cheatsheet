@@ -2,6 +2,7 @@ export type ToggleDelta =
   | 'mask'
   | 'dropout'
   | 'fp8'
+  | 'centered'
   | 'weightDecay'
   | 'momentum'
   | 'nesterov'
@@ -47,6 +48,10 @@ export type AttentionExample = {
   content: Record<AttentionMode, AttentionContent>
   dropoutContent?: Partial<Record<AttentionMode, AttentionContent>>
   fp8Content?: Partial<Record<AttentionMode, AttentionContent>>
+  centeredContent?: Partial<Record<AttentionMode, AttentionContent>>
+  centeredWeightDecayContent?: Partial<Record<AttentionMode, AttentionContent>>
+  centeredMomentumContent?: Partial<Record<AttentionMode, AttentionContent>>
+  centeredMomentumWeightDecayContent?: Partial<Record<AttentionMode, AttentionContent>>
   weightDecayContent?: Partial<Record<AttentionMode, AttentionContent>>
   moonshotLrContent?: Partial<Record<AttentionMode, AttentionContent>>
   moonshotLrWeightDecayContent?: Partial<Record<AttentionMode, AttentionContent>>
@@ -60,6 +65,7 @@ export type CatalogItem = {
   id: string
   label: string
   exampleId?: string
+  hidden?: boolean
 }
 
 export type CatalogSection = {

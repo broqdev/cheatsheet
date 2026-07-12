@@ -96,6 +96,7 @@ type ToggleQueryState = {
   attentionMaskEnabled: boolean
   dropoutEnabled: boolean
   fp8Enabled: boolean
+  centeredEnabled: boolean
   weightDecayEnabled: boolean
   moonshotLrEnabled: boolean
   momentumEnabled: boolean
@@ -106,6 +107,7 @@ const toggleQueryKeys = {
   attentionMaskEnabled: ['mask'],
   dropoutEnabled: ['dropout'],
   fp8Enabled: ['fp8'],
+  centeredEnabled: ['centered'],
   weightDecayEnabled: ['weightDecay', 'wd'],
   moonshotLrEnabled: ['moonshotLr', 'moonshot', 'mslr'],
   momentumEnabled: ['momentum', 'mom'],
@@ -116,6 +118,7 @@ const canonicalToggleQueryKeys = {
   attentionMaskEnabled: 'mask',
   dropoutEnabled: 'dropout',
   fp8Enabled: 'fp8',
+  centeredEnabled: 'centered',
   weightDecayEnabled: 'weightDecay',
   moonshotLrEnabled: 'moonshotLr',
   momentumEnabled: 'momentum',
@@ -131,6 +134,7 @@ function emptyToggleState(): ToggleQueryState {
     attentionMaskEnabled: false,
     dropoutEnabled: false,
     fp8Enabled: false,
+    centeredEnabled: false,
     weightDecayEnabled: false,
     moonshotLrEnabled: false,
     momentumEnabled: false,
@@ -149,6 +153,7 @@ function toggleStateFromUnknown(value: unknown): ToggleQueryState {
     attentionMaskEnabled: record.attentionMaskEnabled === true,
     dropoutEnabled: record.dropoutEnabled === true,
     fp8Enabled: record.fp8Enabled === true,
+    centeredEnabled: record.centeredEnabled === true,
     weightDecayEnabled: record.weightDecayEnabled === true,
     moonshotLrEnabled: record.moonshotLrEnabled === true,
     momentumEnabled: record.momentumEnabled === true,
@@ -212,6 +217,7 @@ function toggleStateFromSearch(
       queryToggleValue(params, 'attentionMaskEnabled') ?? baseState.attentionMaskEnabled,
     dropoutEnabled: queryToggleValue(params, 'dropoutEnabled') ?? baseState.dropoutEnabled,
     fp8Enabled: queryToggleValue(params, 'fp8Enabled') ?? baseState.fp8Enabled,
+    centeredEnabled: queryToggleValue(params, 'centeredEnabled') ?? baseState.centeredEnabled,
     weightDecayEnabled:
       queryToggleValue(params, 'weightDecayEnabled') ?? baseState.weightDecayEnabled,
     moonshotLrEnabled:
@@ -249,6 +255,8 @@ function availableToggleState(example: AttentionExample, toggleState: ToggleQuer
       toggleState.fp8Enabled &&
       example.id === 'flash3' &&
       Boolean(example.fp8Content?.[attentionMode]),
+    centeredEnabled:
+      toggleState.centeredEnabled && Boolean(example.centeredContent?.[attentionMode]),
     weightDecayEnabled:
       toggleState.weightDecayEnabled &&
       Boolean(example.weightDecayContent?.[attentionMode]),
@@ -275,6 +283,10 @@ function availableToggleKeys(example: AttentionExample, toggleState: ToggleQuery
 
   if (example.id === 'flash3' && example.fp8Content?.[attentionMode]) {
     availableKeys.add('fp8Enabled')
+  }
+
+  if (example.centeredContent?.[attentionMode]) {
+    availableKeys.add('centeredEnabled')
   }
 
   if (example.weightDecayContent?.[attentionMode]) {
@@ -348,6 +360,9 @@ function CheatSheetViewPage() {
   const [fp8Enabled, setFp8Enabled] = useState(
     () => viewStateFromLocation().toggleState.fp8Enabled
   )
+  const [centeredEnabled, setCenteredEnabled] = useState(
+    () => viewStateFromLocation().toggleState.centeredEnabled
+  )
   const [weightDecayEnabled, setWeightDecayEnabled] = useState(
     () => viewStateFromLocation().toggleState.weightDecayEnabled
   )
@@ -367,6 +382,12 @@ function CheatSheetViewPage() {
   const attentionMode: AttentionMode = attentionMaskEnabled ? 'masked' : 'unmasked'
   const dropoutContent = activeExample.dropoutContent?.[attentionMode]
   const fp8Content = activeExample.fp8Content?.[attentionMode]
+  const centeredContent = activeExample.centeredContent?.[attentionMode]
+  const centeredWeightDecayContent =
+    activeExample.centeredWeightDecayContent?.[attentionMode]
+  const centeredMomentumContent = activeExample.centeredMomentumContent?.[attentionMode]
+  const centeredMomentumWeightDecayContent =
+    activeExample.centeredMomentumWeightDecayContent?.[attentionMode]
   const weightDecayContent = activeExample.weightDecayContent?.[attentionMode]
   const moonshotLrContent = activeExample.moonshotLrContent?.[attentionMode]
   const moonshotLrWeightDecayContent =
@@ -379,11 +400,13 @@ function CheatSheetViewPage() {
   const attentionMaskAvailable = hasAttentionMaskToggle(activeExample)
   const dropoutAvailable = activeExample.id === 'flash1' && Boolean(dropoutContent)
   const fp8Available = activeExample.id === 'flash3' && Boolean(fp8Content)
+  const centeredAvailable = Boolean(centeredContent)
   const weightDecayAvailable = Boolean(weightDecayContent)
   const moonshotLrAvailable = Boolean(moonshotLrContent)
   const momentumAvailable = Boolean(momentumContent)
   const nesterovAvailable = Boolean(nesterovContent)
   const canUseWeightDecay = weightDecayEnabled && weightDecayAvailable
+  const canUseCentered = centeredEnabled && centeredAvailable
   const canUseMoonshotLr = moonshotLrEnabled && moonshotLrAvailable
   const canUseMomentum = momentumEnabled && momentumAvailable
   const canUseNesterov = nesterovEnabled && nesterovAvailable && canUseMomentum
@@ -393,6 +416,19 @@ function CheatSheetViewPage() {
   )
   const activeContent =
     [
+      {
+        active: canUseCentered && canUseMomentum && canUseWeightDecay,
+        content: centeredMomentumWeightDecayContent,
+      },
+      {
+        active: canUseCentered && canUseMomentum,
+        content: centeredMomentumContent,
+      },
+      {
+        active: canUseCentered && canUseWeightDecay,
+        content: centeredWeightDecayContent,
+      },
+      { active: canUseCentered, content: centeredContent },
       { active: canUseNesterov && canUseWeightDecay, content: nesterovWeightDecayContent },
       { active: canUseNesterov, content: nesterovContent },
       { active: canUseMomentum && canUseWeightDecay, content: momentumWeightDecayContent },
@@ -460,6 +496,7 @@ function CheatSheetViewPage() {
       attentionMaskEnabled,
       dropoutEnabled,
       fp8Enabled,
+      centeredEnabled,
       weightDecayEnabled,
       moonshotLrEnabled,
       momentumEnabled,
@@ -471,6 +508,7 @@ function CheatSheetViewPage() {
     setAttentionMaskEnabled(toggleState.attentionMaskEnabled)
     setDropoutEnabled(toggleState.dropoutEnabled)
     setFp8Enabled(toggleState.fp8Enabled)
+    setCenteredEnabled(toggleState.centeredEnabled)
     setWeightDecayEnabled(toggleState.weightDecayEnabled)
     setMoonshotLrEnabled(toggleState.moonshotLrEnabled)
     setMomentumEnabled(toggleState.momentumEnabled)
@@ -573,6 +611,21 @@ function CheatSheetViewPage() {
     const nextToggleState = availableToggleState(activeExample, {
       ...currentToggleState(),
       weightDecayEnabled: enabled,
+    })
+
+    applyToggleState(nextToggleState)
+    resetExampleState()
+    replaceUrlForToggleState(activeExample, nextToggleState)
+  }
+
+  function toggleCentered(enabled: boolean) {
+    if (enabled && !centeredAvailable) {
+      return
+    }
+
+    const nextToggleState = availableToggleState(activeExample, {
+      ...currentToggleState(),
+      centeredEnabled: enabled,
     })
 
     applyToggleState(nextToggleState)
@@ -771,6 +824,8 @@ function CheatSheetViewPage() {
         dropoutEnabled={dropoutEnabled}
         fp8Available={fp8Available}
         fp8Enabled={fp8Enabled}
+        centeredAvailable={centeredAvailable}
+        centeredEnabled={centeredEnabled}
         weightDecayAvailable={weightDecayAvailable}
         weightDecayEnabled={weightDecayEnabled}
         moonshotLrAvailable={moonshotLrAvailable}
@@ -781,6 +836,7 @@ function CheatSheetViewPage() {
         nesterovEnabled={nesterovEnabled}
         onToggleDropout={toggleDropout}
         onToggleFp8={toggleFp8}
+        onToggleCentered={toggleCentered}
         onToggleAttentionMask={toggleAttentionMask}
         onToggleWeightDecay={toggleWeightDecay}
         onToggleMoonshotLr={toggleMoonshotLr}

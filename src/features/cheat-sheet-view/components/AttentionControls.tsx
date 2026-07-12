@@ -10,6 +10,8 @@ type AttentionControlsProps = {
   dropoutEnabled: boolean
   fp8Available: boolean
   fp8Enabled: boolean
+  centeredAvailable: boolean
+  centeredEnabled: boolean
   weightDecayAvailable: boolean
   weightDecayEnabled: boolean
   moonshotLrAvailable: boolean
@@ -20,6 +22,7 @@ type AttentionControlsProps = {
   nesterovEnabled: boolean
   onToggleDropout: (enabled: boolean) => void
   onToggleFp8: (enabled: boolean) => void
+  onToggleCentered: (enabled: boolean) => void
   onToggleAttentionMask: (enabled: boolean) => void
   onToggleWeightDecay: (enabled: boolean) => void
   onToggleMoonshotLr: (enabled: boolean) => void
@@ -48,6 +51,8 @@ export function AttentionControls({
   dropoutEnabled,
   fp8Available,
   fp8Enabled,
+  centeredAvailable,
+  centeredEnabled,
   weightDecayAvailable,
   weightDecayEnabled,
   moonshotLrAvailable,
@@ -58,6 +63,7 @@ export function AttentionControls({
   nesterovEnabled,
   onToggleDropout,
   onToggleFp8,
+  onToggleCentered,
   onToggleAttentionMask,
   onToggleWeightDecay,
   onToggleMoonshotLr,
@@ -66,6 +72,7 @@ export function AttentionControls({
 }: AttentionControlsProps) {
   const dropoutActive = dropoutAvailable && dropoutEnabled
   const fp8Active = fp8Available && fp8Enabled
+  const centeredActive = centeredAvailable && centeredEnabled
   const weightDecayActive = weightDecayAvailable && weightDecayEnabled
   const moonshotLrActive = moonshotLrAvailable && moonshotLrEnabled
   const momentumActive = momentumAvailable && momentumEnabled
@@ -74,6 +81,7 @@ export function AttentionControls({
     attentionMaskAvailable ||
     dropoutAvailable ||
     fp8Available ||
+    centeredAvailable ||
     weightDecayAvailable ||
     moonshotLrAvailable ||
     momentumAvailable ||
@@ -110,6 +118,17 @@ export function AttentionControls({
             onChange={(event) => onToggleDropout(event.currentTarget.checked)}
           />
           <ToggleLabel delta="dropout">Dropout</ToggleLabel>
+        </label>
+      ) : null}
+
+      {centeredAvailable ? (
+        <label className={`checkbox-control${centeredActive ? ' active' : ''}`}>
+          <input
+            type="checkbox"
+            checked={centeredActive}
+            onChange={(event) => onToggleCentered(event.currentTarget.checked)}
+          />
+          <ToggleLabel delta="centered">Centered Gradient Average</ToggleLabel>
         </label>
       ) : null}
 

@@ -1,10 +1,12 @@
 import type { AttentionExample, CatalogSection } from '../model'
+import { adagradExample } from './subPages/adagrad'
 import { adamExample } from './subPages/adam'
 import { adamWExample } from './subPages/adamw'
 import { flashAttention1Example } from './subPages/flashAttention1'
 import { flashAttention2Example } from './subPages/flashAttention2'
 import { flashAttention3Example } from './subPages/flashAttention3'
 import { flashAttention4Example } from './subPages/flashAttention4'
+import { lbfgsExample } from './subPages/lbfgs'
 import { muonExample } from './subPages/muon'
 import { naiveAttentionExample } from './subPages/naiveAttention'
 import { rmspropExample } from './subPages/rmsprop'
@@ -27,13 +29,22 @@ export const catalogSections: CatalogSection[] = [
     label: 'Optimizer',
     items: [
       { id: 'catalog-sgd', label: 'SGD', exampleId: 'sgd' },
-      { id: 'catalog-rmsprop', label: 'RMSprop', exampleId: 'rmsprop' },
+      { id: 'catalog-adagrad', label: 'AdaGrad', exampleId: 'adagrad' },
+      { id: 'catalog-rmsprop', label: 'RMSProp', exampleId: 'rmsprop' },
       { id: 'catalog-adam', label: 'Adam', exampleId: 'adam' },
       { id: 'catalog-adamw', label: 'AdamW', exampleId: 'adamw' },
+      { id: 'catalog-lbfgs', label: 'L-BFGS', exampleId: 'lbfgs', hidden: true },
       { id: 'catalog-muon', label: 'Muon', exampleId: 'muon' },
     ],
   },
 ]
+
+export const navigationCatalogSections = catalogSections
+  .map((section) => ({
+    ...section,
+    items: section.items.filter((item) => !item.hidden),
+  }))
+  .filter((section) => section.items.length > 0)
 
 export const examples: AttentionExample[] = [
   naiveAttentionExample,
@@ -42,9 +53,11 @@ export const examples: AttentionExample[] = [
   flashAttention3Example,
   flashAttention4Example,
   sgdExample,
+  adagradExample,
   rmspropExample,
   adamExample,
   adamWExample,
+  lbfgsExample,
   muonExample,
 ]
 
@@ -61,7 +74,12 @@ export function examplesForExampleGroup(exampleId: string) {
     return examples
   }
 
-  const activeSectionExampleIds = new Set(exampleIdsForSection(activeSection))
+  const navigationSection = navigationCatalogSections.find(
+    (section) => section.id === activeSection.id
+  )
+  const activeSectionExampleIds = new Set(
+    navigationSection ? exampleIdsForSection(navigationSection) : []
+  )
 
   return examples.filter((example) => activeSectionExampleIds.has(example.id))
 }
