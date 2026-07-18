@@ -237,6 +237,31 @@
     animation: panel-in 220ms ease both;
   }
 
+  .split-panel-resizable {
+    --split-panel-primary-width: 45%;
+    @apply relative;
+    grid-template-columns: minmax(0, var(--split-panel-primary-width)) minmax(0, 1fr);
+  }
+
+  .split-panel-resizable.is-resizing {
+    @apply cursor-col-resize select-none;
+  }
+
+  .split-panel-resize-handle {
+    @apply absolute inset-y-0 z-[4] w-5 -translate-x-1/2 cursor-col-resize touch-none outline-none;
+    left: var(--split-panel-primary-width);
+  }
+
+  .split-panel-resize-handle::after {
+    @apply absolute top-1/2 left-1/2 h-10 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[rgba(0,127,112,0.38)] transition-[background,box-shadow,width] duration-150 ease-out content-[""];
+  }
+
+  .split-panel-resize-handle:hover::after,
+  .split-panel-resize-handle:focus-visible::after,
+  .split-panel-resizable.is-resizing .split-panel-resize-handle::after {
+    @apply w-1.5 bg-accent shadow-[0_0_0_3px_rgba(255,255,255,0.88)];
+  }
+
   @supports (height: 1dvh) {
     .main-panel {
       height: clamp(540px, 72dvh, 780px);
@@ -468,6 +493,14 @@
     height: clamp(600px, 82vh, 820px);
   }
 
+  .split-panel-resizable {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .split-panel-resize-handle {
+    @apply hidden;
+  }
+
   @supports (height: 1dvh) {
     .main-panel {
       height: clamp(600px, 82dvh, 820px);
@@ -480,6 +513,12 @@
 
   .code-region {
     @apply max-h-none;
+  }
+}
+
+@media (min-width: 921px) and (pointer: coarse) {
+  .split-panel-resize-handle {
+    @apply w-11;
   }
 }
 
