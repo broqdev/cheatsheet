@@ -222,6 +222,9 @@ export function AlgorithmPapers({
             <strong>Algorithm {blocks.length + noteIndex + 1}</strong>
             <h2>{note.title}</h2>
           </header>
+          {note.intro ? (
+            <p className="algorithm-intro">{renderSegments(note.intro)}</p>
+          ) : null}
           {note.require ? (
             <p className="algorithm-require">
               <strong>{note.requireLabel ?? 'Given'}:</strong> {renderSegments(note.require)}

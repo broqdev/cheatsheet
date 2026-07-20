@@ -8,7 +8,7 @@ const adamRequire = [
   text('Parameters '),
   math(String.raw`\theta_{t-1}`),
   text(', gradients '),
-  math(String.raw`g_t=\nabla_{\theta}L_t(\theta_{t-1})`),
+  math(String.raw`g_t=\nabla_{\theta}L(\theta_{t-1})`),
   text(', learning rate '),
   math(String.raw`\gamma`),
   text(', moment coefficients '),
@@ -24,7 +24,7 @@ const adamWeightDecayRequire = [
   text('Parameters '),
   math(String.raw`\theta_{t-1}`),
   text(', gradients '),
-  math(String.raw`g_t=\nabla_{\theta}L_t(\theta_{t-1})`),
+  math(String.raw`g_t=\nabla_{\theta}L(\theta_{t-1})`),
   text(', learning rate '),
   math(String.raw`\gamma`),
   text(', moment coefficients '),
@@ -259,7 +259,7 @@ export const adamExample: AttentionExample = {
   urlTag: 'optimizer/adam',
   label: 'Adam',
   description:
-    'Adam builds adaptive moments from the gradient; coupled L2, when enabled, is folded into that gradient before the moments.',
+    'Adam combines momentum with adaptive step sizes, using gradient averages to move quickly while remaining stable.',
   algorithmTitle: 'Adam',
   content: {
     unmasked: adamContent,

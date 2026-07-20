@@ -18,7 +18,7 @@ const baseRequire = [
   text('Parameters '),
   math(String.raw`\theta_{t-1}`),
   text(', gradients '),
-  math(String.raw`g_t=\nabla_{\theta}L_t(\theta_{t-1})`),
+  math(String.raw`g_t=\nabla_{\theta}L(\theta_{t-1})`),
   text(', and learning rate '),
   math(String.raw`\gamma`),
 ]
@@ -304,7 +304,7 @@ export const sgdExample: AttentionExample = {
   urlTag: 'optimizer/sgd',
   label: 'SGD',
   description:
-    'Stochastic gradient descent applies a learning-rate-scaled gradient step, with optional coupled weight decay, momentum, and PyTorch-style Nesterov lookahead.',
+    'SGD moves parameters against the loss gradient, using a learning rate to set the step size.',
   algorithmTitle: 'SGD',
   content: {
     unmasked: sgdContent,

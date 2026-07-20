@@ -31,7 +31,7 @@ function rmspropRequire({ centered, momentum, weightDecay }: RmspropVariant) {
     text('Parameters '),
     math(String.raw`\theta_{t-1}`),
     text(', gradients '),
-    math(String.raw`g_t=\nabla_{\theta}L_t(\theta_{t-1})`),
+    math(String.raw`g_t=\nabla_{\theta}L(\theta_{t-1})`),
     text(', learning rate '),
     math(String.raw`\gamma`),
     text(', square-average coefficient '),
@@ -310,7 +310,7 @@ export const rmspropExample: AttentionExample = {
   urlTag: 'optimizer/rmsprop',
   label: 'RMSProp',
   description:
-    'RMSProp scales gradients by a running square average, with optional centered variance correction, coupled weight decay, and momentum.',
+    'RMSProp adapts each step using a moving average of recent squared gradients, keeping updates steady as gradient scales change.',
   algorithmTitle: 'RMSProp',
   content: {
     unmasked: rmspropContent,

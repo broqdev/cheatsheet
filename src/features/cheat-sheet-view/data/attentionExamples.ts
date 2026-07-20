@@ -11,6 +11,8 @@ import { muonExample } from './subPages/muon'
 import { naiveAttentionExample } from './subPages/naiveAttention'
 import { rmspropExample } from './subPages/rmsprop'
 import { sgdExample } from './subPages/sgd'
+import { shampooExample } from './subPages/shampoo'
+import { soapExample } from './subPages/soap'
 
 type CatalogGroup = {
   id: string
@@ -41,9 +43,10 @@ const catalogGroups: CatalogGroup[] = [
       adamExample,
       adamWExample,
       lbfgsExample,
+      shampooExample,
+      soapExample,
       muonExample,
     ],
-    hiddenExampleIds: ['lbfgs'],
   },
 ]
 

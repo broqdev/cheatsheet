@@ -5,6 +5,7 @@ import { CatalogDropdown } from '../features/cheat-sheet-view/components/Catalog
 import { CheatsheetSummary } from '../features/cheat-sheet-view/components/CheatsheetSummary'
 import { CodePanel } from '../features/cheat-sheet-view/components/CodePanel'
 import { ExampleTabs } from '../features/cheat-sheet-view/components/ExampleTabs'
+import { ResizableSplitPanel } from '../features/cheat-sheet-view/components/ResizableSplitPanel'
 import {
   exampleFromTag,
   examples,
@@ -278,35 +279,39 @@ function CheatSheetViewPage() {
 
       <CheatsheetSummary description={activeExample.description} />
 
-      <section
+      <ResizableSplitPanel
+        ariaLabel={`${activeExample.label} equations and code`}
         className="main-panel"
-        id="cheatsheet-panel"
-        aria-label={`${activeExample.label} equations and code`}
-        role="tabpanel"
-      >
-        <AlgorithmPapers
-          activeExample={activeExample}
-          activeLineId={activeLine?.id}
-          blocks={blocks}
-          latexCopied={copiedTarget === 'latex'}
-          notes={activeContent.notes}
-          prelude={activeContent.prelude}
-          onCopyLatex={() => copyRegion('latex', activeLatex)}
-          onLineActivate={handleAlgorithmRowClick}
-          onLineFocus={setHoveredLineId}
-          onLineLeave={() => setHoveredLineId(null)}
-          selectedLineId={selectedLineId}
-        />
-
-        <CodePanel
-          ref={codeRegionRef}
-          activeCodeLines={activeCodeLines}
-          codeCopied={copiedTarget === 'code'}
-          codeLines={codeLines}
-          label={activeExample.label}
-          onCopyCode={() => copyRegion('code', activeContent.code)}
-        />
-      </section>
+        defaultPrimaryPercent={47}
+        primary={
+          <AlgorithmPapers
+            activeExample={activeExample}
+            activeLineId={activeLine?.id}
+            blocks={blocks}
+            latexCopied={copiedTarget === 'latex'}
+            notes={activeContent.notes}
+            prelude={activeContent.prelude}
+            onCopyLatex={() => copyRegion('latex', activeLatex)}
+            onLineActivate={handleAlgorithmRowClick}
+            onLineFocus={setHoveredLineId}
+            onLineLeave={() => setHoveredLineId(null)}
+            selectedLineId={selectedLineId}
+          />
+        }
+        primaryLabel="equations"
+        resizeLabel="Resize equations and code panels"
+        secondary={
+          <CodePanel
+            ref={codeRegionRef}
+            activeCodeLines={activeCodeLines}
+            codeCopied={copiedTarget === 'code'}
+            codeLines={codeLines}
+            label={activeExample.label}
+            onCopyCode={() => copyRegion('code', activeContent.code)}
+          />
+        }
+        secondaryLabel="code"
+      />
 
       <AttentionControls controls={controls} onToggle={toggleVariant} />
 

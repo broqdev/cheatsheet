@@ -13,7 +13,7 @@ function adagradRequire({ weightDecay }: AdagradVariant) {
     text('Parameters '),
     math(String.raw`\theta_{t-1}`),
     text(', gradients '),
-    math(String.raw`g_t=\nabla_{\theta}L_t(\theta_{t-1})`),
+    math(String.raw`g_t=\nabla_{\theta}L(\theta_{t-1})`),
     text(', learning rate '),
     math(String.raw`\gamma`),
     text(', learning-rate decay '),
@@ -163,7 +163,8 @@ export const adagradExample: AttentionExample = {
   id: 'adagrad',
   urlTag: 'optimizer/adagrad',
   label: 'AdaGrad',
-  description: "AdaGrad adapts each parameter's step using accumulated squared gradients.",
+  description:
+    "AdaGrad shrinks each parameter's step as its accumulated gradient history grows.",
   algorithmTitle: 'AdaGrad',
   content: {
     unmasked: adagradContent,
