@@ -10,7 +10,7 @@ const muonRequire = [
   text('Hidden 2D matrix parameters '),
   math(String.raw`\theta_{t-1}`),
   text(', gradients '),
-  math(String.raw`g_t=\nabla_{\theta}L_t(\theta_{t-1})`),
+  math(String.raw`g_t=\nabla_{\theta}L(\theta_{t-1})`),
   text(', learning rate '),
   math(String.raw`\gamma`),
   text(', momentum coefficient '),
@@ -26,7 +26,7 @@ const muonWeightDecayRequire = [
   text('Hidden 2D matrix parameters '),
   math(String.raw`\theta_{t-1}`),
   text(', gradients '),
-  math(String.raw`g_t=\nabla_{\theta}L_t(\theta_{t-1})`),
+  math(String.raw`g_t=\nabla_{\theta}L(\theta_{t-1})`),
   text(', learning rate '),
   math(String.raw`\gamma`),
   text(', momentum coefficient '),
@@ -516,7 +516,7 @@ export const muonExample: AttentionExample = {
   urlTag: 'optimizer/muon',
   label: 'Muon',
   description:
-    'Muon applies momentum to hidden matrix gradients, approximates their polar factor with Newton-Schulz5, then steps in spectral-norm units.',
+    'Muon reshapes momentum into an approximately orthogonal matrix update, balancing movement across parameter directions.',
   algorithmTitle: 'Muon',
   content: {
     unmasked: muonContent,

@@ -331,6 +331,14 @@
     @apply mt-[7px] mb-1 text-[1.01rem];
   }
 
+  .algorithm-intro {
+    @apply mt-[7px] mb-1 text-[1.01rem];
+  }
+
+  .algorithm-intro + .algorithm-require {
+    @apply mt-1;
+  }
+
   .algorithm-lines {
     @apply grid border-b border-ink pb-[5px];
   }

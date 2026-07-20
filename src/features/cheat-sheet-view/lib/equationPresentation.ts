@@ -60,6 +60,10 @@ function blockToLatex(block: AlgorithmBlock, index: number, example: AttentionEx
 function noteToLatex(note: LatexBlock, index: number) {
   const lines = [`\\textbf{Algorithm ${index + 1}} ${note.title}`]
 
+  if (note.intro) {
+    lines.push(segmentsToLatex(note.intro))
+  }
+
   if (note.require) {
     lines.push(`\\textbf{${note.requireLabel ?? 'Given'}:} ${segmentsToLatex(note.require)}`)
   }

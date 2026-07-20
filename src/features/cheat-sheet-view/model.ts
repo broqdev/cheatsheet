@@ -38,6 +38,7 @@ export type AttentionMode = 'unmasked' | 'masked'
 export type LatexBlock = {
   id: string
   title: string
+  intro?: Segment[]
   require?: Segment[]
   requireLabel?: string
   rows: AlgorithmLine[]

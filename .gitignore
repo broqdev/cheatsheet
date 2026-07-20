@@ -13,6 +13,7 @@ coverage/
 .vite/
 .codex/
 .noisy_room/
+.worktrees/
 
 # Environment files
 .env

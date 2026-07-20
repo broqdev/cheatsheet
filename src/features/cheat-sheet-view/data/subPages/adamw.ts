@@ -8,7 +8,7 @@ const adamWRequire = [
   text('Parameters '),
   math(String.raw`\theta_{t-1}`),
   text(', gradients '),
-  math(String.raw`g_t=\nabla_{\theta}L_t(\theta_{t-1})`),
+  math(String.raw`g_t=\nabla_{\theta}L(\theta_{t-1})`),
   text(', learning rate '),
   math(String.raw`\gamma`),
   text(', moment coefficients '),
@@ -24,7 +24,7 @@ const adamWWeightDecayRequire = [
   text('Parameters '),
   math(String.raw`\theta_{t-1}`),
   text(', gradients '),
-  math(String.raw`g_t=\nabla_{\theta}L_t(\theta_{t-1})`),
+  math(String.raw`g_t=\nabla_{\theta}L(\theta_{t-1})`),
   text(', learning rate '),
   math(String.raw`\gamma`),
   text(', moment coefficients '),
@@ -268,7 +268,7 @@ export const adamWExample: AttentionExample = {
   urlTag: 'optimizer/adamw',
   label: 'AdamW',
   description:
-    'AdamW keeps raw-gradient Adam moments while applying weight decay as a separate parameter shrink.',
+    'AdamW pairs adaptive updates with separate weight decay, keeping optimization and regularization distinct.',
   algorithmTitle: 'AdamW',
   content: {
     unmasked: adamWContent,

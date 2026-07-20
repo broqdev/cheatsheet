@@ -17,11 +17,61 @@ type ResizableSplitPanelProps = {
   secondaryLabel: string
 }
 
+type SplitPanelStorage = Pick<Storage, 'getItem' | 'setItem'>
+
 const minimumPrimaryPercent = 30
 const maximumPrimaryPercent = 70
 
+export const splitPanelStorageKey = 'broq-cheatsheet:split-panel-primary-percent'
+
 function clampPrimaryPercent(value: number) {
   return Math.min(maximumPrimaryPercent, Math.max(minimumPrimaryPercent, value))
+}
+
+export function readStoredPrimaryPercent(
+  defaultPrimaryPercent: number,
+  storage: Pick<SplitPanelStorage, 'getItem'> | undefined
+) {
+  const fallback = clampPrimaryPercent(defaultPrimaryPercent)
+
+  try {
+    const storedValue = storage?.getItem(splitPanelStorageKey)
+
+    if (!storedValue?.trim()) {
+      return fallback
+    }
+
+    const parsedValue = Number(storedValue)
+    return Number.isFinite(parsedValue) ? clampPrimaryPercent(parsedValue) : fallback
+  } catch {
+    return fallback
+  }
+}
+
+export function writeStoredPrimaryPercent(
+  primaryPercent: number,
+  storage: Pick<SplitPanelStorage, 'setItem'> | undefined
+) {
+  try {
+    storage?.setItem(
+      splitPanelStorageKey,
+      String(clampPrimaryPercent(primaryPercent))
+    )
+  } catch {
+    // Storage may be unavailable in embedded or restricted browser contexts.
+  }
+}
+
+function browserStorage() {
+  if (typeof window === 'undefined') {
+    return undefined
+  }
+
+  try {
+    return window.localStorage
+  } catch {
+    return undefined
+  }
 }
 
 export const ResizableSplitPanel = forwardRef<HTMLElement, ResizableSplitPanelProps>(
@@ -38,11 +88,28 @@ export const ResizableSplitPanel = forwardRef<HTMLElement, ResizableSplitPanelPr
     },
     forwardedRef
   ) {
-    const [primaryPercent, setPrimaryPercent] = useState(defaultPrimaryPercent)
+    const [primaryPercent, setPrimaryPercent] = useState(() =>
+      readStoredPrimaryPercent(defaultPrimaryPercent, browserStorage())
+    )
     const [isResizing, setIsResizing] = useState(false)
     const panelRef = useRef<HTMLElement>(null)
+    const primaryPercentRef = useRef(primaryPercent)
 
     useImperativeHandle(forwardedRef, () => panelRef.current as HTMLElement, [])
+
+    function updatePrimaryPercent(value: number, persist = false) {
+      const nextPrimaryPercent = clampPrimaryPercent(value)
+      primaryPercentRef.current = nextPrimaryPercent
+      setPrimaryPercent(nextPrimaryPercent)
+
+      if (persist) {
+        writeStoredPrimaryPercent(nextPrimaryPercent, browserStorage())
+      }
+    }
+
+    function persistPrimaryPercent() {
+      writeStoredPrimaryPercent(primaryPercentRef.current, browserStorage())
+    }
 
     function setPrimaryPercentFromClientX(clientX: number) {
       const panelRect = panelRef.current?.getBoundingClientRect()
@@ -51,9 +118,7 @@ export const ResizableSplitPanel = forwardRef<HTMLElement, ResizableSplitPanelPr
         return
       }
 
-      setPrimaryPercent(
-        clampPrimaryPercent(((clientX - panelRect.left) / panelRect.width) * 100)
-      )
+      updatePrimaryPercent(((clientX - panelRect.left) / panelRect.width) * 100)
     }
 
     function handlePointerDown(event: ReactPointerEvent<HTMLDivElement>) {
@@ -76,6 +141,8 @@ export const ResizableSplitPanel = forwardRef<HTMLElement, ResizableSplitPanelPr
     }
 
     function stopResizing(event: ReactPointerEvent<HTMLDivElement>) {
+      persistPrimaryPercent()
+
       if (event.currentTarget.hasPointerCapture(event.pointerId)) {
         event.currentTarget.releasePointerCapture(event.pointerId)
       }
@@ -102,7 +169,7 @@ export const ResizableSplitPanel = forwardRef<HTMLElement, ResizableSplitPanelPr
       }
 
       event.preventDefault()
-      setPrimaryPercent(clampPrimaryPercent(nextPrimaryPercent))
+      updatePrimaryPercent(nextPrimaryPercent, true)
     }
 
     const roundedPrimaryPercent = Math.round(primaryPercent)
@@ -133,7 +200,10 @@ export const ResizableSplitPanel = forwardRef<HTMLElement, ResizableSplitPanelPr
           aria-valuetext={`${roundedPrimaryPercent}% ${primaryLabel}, ${100 - roundedPrimaryPercent}% ${secondaryLabel}`}
           tabIndex={0}
           onKeyDown={handleKeyDown}
-          onLostPointerCapture={() => setIsResizing(false)}
+          onLostPointerCapture={() => {
+            persistPrimaryPercent()
+            setIsResizing(false)
+          }}
           onPointerCancel={stopResizing}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
